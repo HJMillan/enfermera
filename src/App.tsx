@@ -1,0 +1,357 @@
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Settings, Wifi, ShieldCheck, HeartPulse, Award, Syringe, Bandage, Keyboard } from 'lucide-react';
+import type { BasePatientData, AccesoPerifericoForm as AccesoFormType, UppForm as UppFormType, StoredRecord } from './types/form';
+import { formatCurrentDateTime } from './utils/dateUtils';
+import { haptics } from './utils/haptics';
+import {
+  getPatientContextMemory,
+  savePatientContextMemory,
+  getStoredRecords,
+  getStoredWebhookUrl,
+} from './services/storageService';
+import { submitPatientRecord } from './services/webhookService';
+import { PatientHeader } from './components/common/PatientHeader';
+import { ModuleTabs, type ActiveTab } from './components/navigation/ModuleTabs';
+import { AccesoPerifericoForm } from './components/forms/AccesoPerifericoForm';
+import { UppForm } from './components/forms/UppForm';
+import { HistoryView } from './components/forms/HistoryView';
+import { SettingsModal } from './components/common/SettingsModal';
+import { ShiftSummaryModal } from './components/common/ShiftSummaryModal';
+import { ToastNotification, type ToastData } from './components/common/ToastNotification';
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState<ActiveTab>('ACCESO_PERIFERICO');
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
+  const [toast, setToast] = useState<ToastData | null>(null);
+  const [records, setRecords] = useState<StoredRecord[]>(() => getStoredRecords());
+  const [hasWebhook, setHasWebhook] = useState<boolean>(() => Boolean(getStoredWebhookUrl()));
+
+  // Contexto de paciente persistente
+  const [patient, setPatient] = useState<BasePatientData>(() => {
+    const memory = getPatientContextMemory();
+    return {
+      fechaHora: formatCurrentDateTime(),
+      sector: memory.sector,
+      habitacion: memory.habitacion,
+      cama: memory.cama,
+    };
+  });
+
+  // Cargar registros e información de webhook
+  const reloadData = useCallback(() => {
+    setRecords(getStoredRecords());
+    setHasWebhook(Boolean(getStoredWebhookUrl()));
+  }, []);
+
+  // Actualizar reloj
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setPatient((prev) => ({ ...prev, fechaHora: formatCurrentDateTime() }));
+    }, 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Manejo de cambios en el paciente
+  const handlePatientChange = useCallback((updated: Partial<BasePatientData>) => {
+    setPatient((prev) => {
+      const next = { ...prev, ...updated };
+      savePatientContextMemory({
+        sector: next.sector,
+        habitacion: next.habitacion,
+        cama: next.cama,
+      });
+      return next;
+    });
+  }, []);
+
+  // Botón rápido: Siguiente Cama (+1)
+  const handleNextBed = useCallback(() => {
+    const currentBed = parseInt(patient.cama, 10);
+    const nextBed = isNaN(currentBed) ? 1 : currentBed + 1;
+    handlePatientChange({ cama: String(nextBed) });
+    setToast({
+      type: 'success',
+      message: `Avanzado a Cama ${nextBed} (Sector ${patient.sector} Hab ${patient.habitacion})`,
+    });
+    haptics.light();
+  }, [patient.cama, patient.sector, patient.habitacion, handlePatientChange]);
+
+  // Atajos de teclado globales en Chromebook
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = document.activeElement?.tagName.toLowerCase();
+      if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
+        return;
+      }
+
+      if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        handleNextBed();
+      } else if (e.key === '-') {
+        e.preventDefault();
+        const current = parseInt(patient.cama, 10);
+        if (!isNaN(current) && current > 1) {
+          handlePatientChange({ cama: String(current - 1) });
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleNextBed, handlePatientChange, patient.cama]);
+
+  // Guardar Acceso Periférico
+  const handleAccesoSubmit = async (formData: AccesoFormType) => {
+    await submitPatientRecord('ACCESO_PERIFERICO', formData);
+    reloadData();
+    setToast({
+      type: 'success',
+      message: `✅ Vía: Sec ${formData.sector} Hab ${formData.habitacion} Cama ${formData.cama} (${formData.tieneAcceso ? 'Con vía' : 'Sin vía'})`,
+    });
+    // Auto-avanzar cama
+    const currentBed = parseInt(patient.cama, 10);
+    if (!isNaN(currentBed)) {
+      handlePatientChange({ cama: String(currentBed + 1) });
+    }
+    haptics.success();
+  };
+
+  // Guardar UPP
+  const handleUppSubmit = async (formData: UppFormType) => {
+    await submitPatientRecord('UPP', formData);
+    reloadData();
+    setToast({
+      type: 'success',
+      message: `✅ UPP: Sec ${formData.sector} Hab ${formData.habitacion} Cama ${formData.cama} (${formData.tieneUpp ? 'Con UPP' : 'Piel Íntegra'})`,
+    });
+    // Auto-avanzar cama
+    const currentBed = parseInt(patient.cama, 10);
+    if (!isNaN(currentBed)) {
+      handlePatientChange({ cama: String(currentBed + 1) });
+    }
+    haptics.success();
+  };
+
+  // Nombres recientes de colocadores de vías del turno para sugerencias
+  const recentColocadores = useMemo(() => {
+    const names = records
+      .filter((r) => r.formType === 'ACCESO_PERIFERICO')
+      .map((r) => (r.data as AccesoFormType).rotuloNombre)
+      .filter((n): n is string => Boolean(n && n.trim().length > 0));
+    return Array.from(new Set(names));
+  }, [records]);
+
+  const viasRecords = records.filter((r) => r.formType === 'ACCESO_PERIFERICO');
+  const uppRecords = records.filter((r) => r.formType === 'UPP');
+  const pendingCount = records.filter((r) => r.syncStatus !== 'SYNCED').length;
+
+  return (
+    <div className="min-h-screen bg-slate-100 flex flex-col antialiased selection:bg-sky-200">
+      {/* Barra de Navegación Principal Superior */}
+      <header className="bg-white border-b border-slate-200 px-3 py-2.5 md:px-6 flex items-center justify-between shadow-xs sticky top-0 z-30">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-600 to-cyan-500 text-white flex items-center justify-center shadow-xs">
+            <HeartPulse className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="font-extrabold text-slate-900 text-base leading-tight">Planilla Enfermera</h1>
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
+              <span className="font-medium text-slate-700">Turno 8:00 a 16:00 hs</span>
+              <span>·</span>
+              {hasWebhook ? (
+                <span className="text-sky-700 font-semibold flex items-center gap-0.5">
+                  <ShieldCheck className="w-3 h-3" /> Nube Activa
+                </span>
+              ) : (
+                <span className="text-amber-700 font-semibold flex items-center gap-0.5">
+                  <Wifi className="w-3 h-3" /> Modo Local
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Botón Cierre de Turno en Header */}
+          <button
+            type="button"
+            onClick={() => setIsShiftModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-xs shadow-xs hover:from-amber-600 hover:to-orange-600 touch-active cursor-pointer"
+            title="Ver resumen y cerrar turno a las 16:00 hs"
+          >
+            <Award className="w-4 h-4" />
+            <span className="hidden sm:inline">Cierre de Turno</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsSettingsOpen(true)}
+            className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 touch-active cursor-pointer"
+            title="Configurar Webhook y Planilla"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+        </div>
+      </header>
+
+      {/* Contenedor Principal: Layout Responsivo de 2 Columnas para Chromebook/PC */}
+      <div className="flex-1 w-full max-w-6xl mx-auto p-2 sm:p-4 lg:grid lg:grid-cols-12 lg:gap-5">
+        {/* PANEL IZQUIERDO (Visible en pantallas medianas y Chromebook): Panel de Control de Ronda */}
+        <aside aria-label="Panel de control del turno" className="hidden lg:block lg:col-span-4 space-y-4">
+          {/* Tarjeta de Ronda y Estado del Turno */}
+          <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Relevamiento del Día</span>
+              <span className="text-xs font-extrabold bg-sky-100 text-sky-800 px-2.5 py-0.5 rounded-full">
+                8:00 - 16:00 hs
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => setActiveTab('ACCESO_PERIFERICO')}
+                className={`w-full p-3 rounded-2xl border text-left flex items-center justify-between transition-all touch-active cursor-pointer ${
+                  activeTab === 'ACCESO_PERIFERICO'
+                    ? 'bg-sky-50/80 border-sky-400 text-sky-950 ring-2 ring-sky-200'
+                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-sky-600 text-white flex items-center justify-center">
+                    <Syringe className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="font-extrabold text-sm block leading-tight">Ronda 1: Vías Periféricas</span>
+                    <span className="text-[11px] text-slate-600">Inspección de catéteres y rótulos</span>
+                  </div>
+                </div>
+                <span className="font-black text-base text-sky-800">{viasRecords.length}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('UPP')}
+                className={`w-full p-3 rounded-2xl border text-left flex items-center justify-between transition-all touch-active cursor-pointer ${
+                  activeTab === 'UPP'
+                    ? 'bg-rose-50/80 border-rose-400 text-rose-950 ring-2 ring-rose-200'
+                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-rose-600 text-white flex items-center justify-center">
+                    <Bandage className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="font-extrabold text-sm block leading-tight">Ronda 2: UPP</span>
+                    <span className="text-[11px] text-slate-600">Piel, Braden y colchones</span>
+                  </div>
+                </div>
+                <span className="font-black text-base text-rose-800">{uppRecords.length}</span>
+              </button>
+            </div>
+
+            {/* Atajos de Chromebook */}
+            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-1.5">
+              <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                <Keyboard className="w-3.5 h-3.5 text-sky-700" />
+                Atajos de Teclado (Chromebook)
+              </span>
+              <ul className="text-[11px] text-slate-600 space-y-1">
+                <li><kbd className="bg-white px-1.5 py-0.5 rounded border border-slate-300 font-bold font-mono">N</kbd> Selecciona NO</li>
+                <li><kbd className="bg-white px-1.5 py-0.5 rounded border border-slate-300 font-bold font-mono">S</kbd> Selecciona SÍ</li>
+                <li><kbd className="bg-white px-1.5 py-0.5 rounded border border-slate-300 font-bold font-mono">Enter</kbd> Guardar y avanzar cama</li>
+                <li><kbd className="bg-white px-1.5 py-0.5 rounded border border-slate-300 font-bold font-mono">+</kbd> / <kbd className="bg-white px-1.5 py-0.5 rounded border border-slate-300 font-bold font-mono">-</kbd> Cambiar cama</li>
+              </ul>
+            </div>
+
+            {/* Botón Cierre de Turno */}
+            <button
+              type="button"
+              onClick={() => setIsShiftModalOpen(true)}
+              className="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm touch-active cursor-pointer"
+            >
+              <Award className="w-4 h-4" />
+              <span>Resumen y Cierre de Turno (16:00 hs)</span>
+            </button>
+          </div>
+        </aside>
+
+        {/* PANEL DERECHO (Principal en móvil y desktop): Formulario Activo y Cabecera */}
+        <main className="lg:col-span-8 flex flex-col space-y-2">
+          {/* Selector de Módulo (Visible en móvil / tablet) */}
+          <div className="w-full lg:hidden">
+            <ModuleTabs
+              activeTab={activeTab}
+              onSelectTab={setActiveTab}
+              viasCount={viasRecords.length}
+              uppCount={uppRecords.length}
+              historyCount={records.length}
+              pendingCount={pendingCount}
+            />
+          </div>
+
+          {/* Cabecera Persistente de Paciente */}
+          {activeTab !== 'HISTORY' && (
+            <div className="w-full">
+              <PatientHeader
+                patient={patient}
+                onChange={handlePatientChange}
+                onNextBed={handleNextBed}
+                activeRound={activeTab}
+                totalCensadasHoy={records.length}
+              />
+            </div>
+          )}
+
+          {/* Formularios */}
+          <div className="w-full pt-1">
+            {activeTab === 'ACCESO_PERIFERICO' && (
+              <AccesoPerifericoForm
+                patient={patient}
+                onSubmit={handleAccesoSubmit}
+                onSwitchToUpp={() => setActiveTab('UPP')}
+                recentColocadores={recentColocadores}
+              />
+            )}
+
+            {activeTab === 'UPP' && (
+              <UppForm
+                patient={patient}
+                onSubmit={handleUppSubmit}
+                onOpenShiftClose={() => setIsShiftModalOpen(true)}
+              />
+            )}
+
+            {activeTab === 'HISTORY' && (
+              <HistoryView records={records} onRefresh={reloadData} />
+            )}
+          </div>
+        </main>
+      </div>
+
+      {/* Modales y Notificaciones */}
+      {isSettingsOpen && (
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => {
+            setIsSettingsOpen(false);
+            reloadData();
+          }}
+          onHistoryCleared={reloadData}
+        />
+      )}
+
+      {isShiftModalOpen && (
+        <ShiftSummaryModal
+          isOpen={isShiftModalOpen}
+          onClose={() => setIsShiftModalOpen(false)}
+          records={records}
+        />
+      )}
+
+      <ToastNotification toast={toast} onClose={() => setToast(null)} />
+    </div>
+  );
+}

@@ -1,0 +1,17 @@
+{
+  "name": "Planilla Enfermera",
+  "short_name": "Planilla",
+  "description": "Sistema de registro y relevamiento de enfermería",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0284c7",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
