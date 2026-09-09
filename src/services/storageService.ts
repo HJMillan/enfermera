@@ -7,7 +7,25 @@ const STORAGE_KEYS = {
   LAST_ROOM: 'pe_last_room',
   LAST_BED: 'pe_last_bed',
   RECORDS_HISTORY: 'pe_records_history_v1',
+  NOTIFICATION_EMAILS: 'pe_notification_emails',
 };
+
+export const DEFAULT_NOTIFICATION_EMAILS = ['jesusmillan86@gmail.com', 'pamelaestua91@gmail.com'];
+
+export function getNotificationEmails(): string[] {
+  const stored = localStorage.getItem(STORAGE_KEYS.NOTIFICATION_EMAILS);
+  if (!stored) return DEFAULT_NOTIFICATION_EMAILS;
+  try {
+    const parsed = JSON.parse(stored);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_NOTIFICATION_EMAILS;
+  } catch {
+    return DEFAULT_NOTIFICATION_EMAILS;
+  }
+}
+
+export function setNotificationEmails(emails: string[]): void {
+  localStorage.setItem(STORAGE_KEYS.NOTIFICATION_EMAILS, JSON.stringify(emails));
+}
 
 // Webhook URL
 export function getStoredWebhookUrl(): string {

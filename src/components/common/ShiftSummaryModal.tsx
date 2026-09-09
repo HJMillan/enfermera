@@ -1,7 +1,9 @@
-import React from 'react';
-import { X, CheckCircle2, Download, Award, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, CheckCircle2, Download, Award, AlertCircle, Mail, Send, RefreshCw } from 'lucide-react';
 import type { StoredRecord, AccesoPerifericoForm, UppForm } from '../../types/form';
-import { exportRecordsToCSV } from '../../services/storageService';
+import { exportRecordsToCSV, getNotificationEmails } from '../../services/storageService';
+import { requestShiftSummaryEmail } from '../../services/webhookService';
+import { haptics } from '../../utils/haptics';
 
 interface ShiftSummaryModalProps {
   isOpen: boolean;
@@ -14,7 +16,15 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
   onClose,
   records,
 }) => {
+  const [isSending, setIsSending] = useState(false);
+  const [sendStatus, setSendStatus] = useState<{ type: 'idle' | 'success' | 'error'; message: string }>({
+    type: 'idle',
+    message: '',
+  });
+
   if (!isOpen) return null;
+
+  const emails = getNotificationEmails();
 
   const viasRecords = records.filter((r) => r.formType === 'ACCESO_PERIFERICO');
   const uppRecords = records.filter((r) => r.formType === 'UPP');
@@ -31,6 +41,34 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
 
   const pendientesSync = records.filter((r) => r.syncStatus !== 'SYNCED').length;
 
+  const handleSendEmailReport = async () => {
+    setIsSending(true);
+    setSendStatus({ type: 'idle', message: '' });
+
+    try {
+      const result = await requestShiftSummaryEmail();
+      if (result.success) {
+        haptics.success();
+        setSendStatus({
+          type: 'success',
+          message: result.message || 'Reporte despachado exitosamente por correo electrónico.',
+        });
+      } else {
+        setSendStatus({
+          type: 'error',
+          message: result.message || 'No se pudo enviar el reporte por correo.',
+        });
+      }
+    } catch (err) {
+      setSendStatus({
+        type: 'error',
+        message: 'Error al enviar: ' + (err instanceof Error ? err.message : 'Error de conexión'),
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs">
       <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
@@ -40,7 +78,7 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
             <Award className="w-6 h-6 text-sky-200" />
             <div>
               <h2 className="font-extrabold text-base md:text-lg leading-tight">Cierre de Turno (8:00 a 16:00 hs)</h2>
-              <p className="text-xs text-sky-100">Resumen consolidado del relevamiento de sala</p>
+              <p className="text-xs text-sky-100">Resumen consolidado y despacho de reporte</p>
             </div>
           </div>
           <button
@@ -114,7 +152,66 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
             </div>
           </div>
 
-          {/* Estado de Sincronización */}
+          {/* Sección de Envío por Correo Electrónico */}
+          <div className="bg-gradient-to-br from-sky-50 to-blue-50/70 border border-sky-200 rounded-2xl p-3.5 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-sky-600 text-white">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="font-bold text-slate-900 text-xs block">Despacho de Reporte por Correo</span>
+                  <span className="text-[11px] text-slate-600">Solo enviará los registros pendientes no despachados previamente</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white/80 border border-sky-100 rounded-xl p-2 text-xs space-y-1">
+              <span className="text-[10px] font-bold uppercase text-slate-600 block">Destinatarios:</span>
+              <div className="flex flex-wrap gap-1">
+                {emails.map((email) => (
+                  <span key={email} className="px-2 py-0.5 rounded-md bg-sky-100 text-sky-800 font-mono text-[11px] font-semibold">
+                    {email}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {sendStatus.type === 'success' && (
+              <div className="p-2.5 rounded-xl bg-emerald-100/80 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 stroke-[2.5]" />
+                <span>{sendStatus.message}</span>
+              </div>
+            )}
+
+            {sendStatus.type === 'error' && (
+              <div className="p-2.5 rounded-xl bg-rose-100/80 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 stroke-[2.5]" />
+                <span>{sendStatus.message}</span>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={handleSendEmailReport}
+              disabled={isSending}
+              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 text-white font-bold text-xs shadow-md shadow-sky-200 flex items-center justify-center gap-2 touch-active cursor-pointer disabled:opacity-60"
+            >
+              {isSending ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Despachando reporte a Google Sheets y Correos...</span>
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4" />
+                  <span>Cerrar Turno y Enviar Reporte por Correo</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Estado de Sincronización Local */}
           <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
               {pendientesSync === 0 ? (
@@ -124,14 +221,14 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
               )}
               <span className="font-semibold text-slate-800">
                 {pendientesSync === 0
-                  ? 'Todos los registros sincronizados con la planilla'
-                  : `${pendientesSync} registros pendientes de sincronizar`}
+                  ? 'Todos los registros del dispositivo sincronizados con la planilla'
+                  : `${pendientesSync} registros pendientes de sincronizar en este dispositivo`}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Acciones */}
+        {/* Acciones del pie */}
         <div className="p-3 bg-slate-50 border-t border-slate-100 flex gap-2">
           <button
             type="button"
@@ -139,15 +236,15 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
             className="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-slate-100 touch-active cursor-pointer"
           >
             <Download className="w-4 h-4" />
-            <span>Descargar Planilla del Día (CSV)</span>
+            <span>Descargar CSV</span>
           </button>
 
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl bg-sky-700 text-white font-bold text-xs shadow-md shadow-sky-200 hover:bg-sky-800 touch-active cursor-pointer"
+            className="py-2.5 px-6 rounded-xl bg-slate-200 text-slate-800 hover:bg-slate-300 font-bold text-xs touch-active cursor-pointer"
           >
-            Aceptar
+            Cerrar
           </button>
         </div>
       </div>

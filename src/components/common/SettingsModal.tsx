@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
-import { X, Settings, Link2, Check, RefreshCw, HelpCircle, FileSpreadsheet, Trash2 } from 'lucide-react';
-import { getStoredWebhookUrl, setStoredWebhookUrl, clearStoredRecords } from '../../services/storageService';
+import { X, Settings, Link2, Check, RefreshCw, HelpCircle, FileSpreadsheet, Trash2, Mail } from 'lucide-react';
+import {
+  getStoredWebhookUrl,
+  setStoredWebhookUrl,
+  clearStoredRecords,
+  getNotificationEmails,
+  setNotificationEmails,
+} from '../../services/storageService';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -10,6 +16,7 @@ interface SettingsModalProps {
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onHistoryCleared }) => {
   const [url, setUrl] = useState(() => getStoredWebhookUrl());
+  const [emailsText, setEmailsText] = useState(() => getNotificationEmails().join(', '));
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [showInstructions, setShowInstructions] = useState(false);
 
@@ -17,6 +24,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
 
   const handleSave = () => {
     setStoredWebhookUrl(url);
+    const parsedEmails = emailsText
+      .split(',')
+      .map((e) => e.trim())
+      .filter((e) => e.length > 0 && e.includes('@'));
+    if (parsedEmails.length > 0) {
+      setNotificationEmails(parsedEmails);
+    }
     onClose();
   };
 
@@ -106,6 +120,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                 No responde. Verifica permisos públicos del script.
               </span>
             )}
+          </div>
+
+          {/* Destinatarios de Correo */}
+          <div>
+            <label className="block font-bold text-slate-800 mb-1 flex items-center gap-1.5">
+              <Mail className="w-4 h-4 text-sky-700" />
+              Destinatarios de Correo (Cierre de Turno)
+            </label>
+            <p className="text-xs text-slate-600 mb-2">
+              Direcciones que recibirán el reporte diario consolidado (separadas por coma).
+            </p>
+            <input
+              type="text"
+              value={emailsText}
+              onChange={(e) => setEmailsText(e.target.value)}
+              placeholder="jesusmillan86@gmail.com, pamelaestua91@gmail.com"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs md:text-sm font-mono focus:border-sky-600 focus:ring-2 focus:ring-sky-100 outline-none"
+            />
           </div>
 
           {/* Guía rápida de Google Sheets */}
