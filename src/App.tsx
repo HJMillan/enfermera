@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Settings, Wifi, ShieldCheck, HeartPulse, Award, Syringe, Bandage, Keyboard } from 'lucide-react';
 import type { BasePatientData, AccesoPerifericoForm as AccesoFormType, UppForm as UppFormType, StoredRecord } from './types/form';
 import { formatCurrentDateTime } from './utils/dateUtils';
@@ -8,7 +8,10 @@ import {
   savePatientContextMemory,
   getStoredRecords,
   getStoredWebhookUrl,
+  getStaffBySector,
+  deleteRecordLocally,
 } from './services/storageService';
+import { MAX_BEDS } from './config/sectorConfig';
 import { submitPatientRecord } from './services/webhookService';
 import { PatientHeader } from './components/common/PatientHeader';
 import { ModuleTabs, type ActiveTab } from './components/navigation/ModuleTabs';
@@ -30,11 +33,15 @@ export default function App() {
   // Contexto de paciente persistente
   const [patient, setPatient] = useState<BasePatientData>(() => {
     const memory = getPatientContextMemory();
+    const staff = getStaffBySector(memory.sector);
     return {
       fechaHora: formatCurrentDateTime(),
       sector: memory.sector,
       habitacion: memory.habitacion,
       cama: memory.cama,
+      historiaClinica: memory.historiaClinica || '',
+      cantidadEnfermeras: staff.enfermeras,
+      cantidadAuxiliares: staff.auxiliares,
     };
   });
 
@@ -60,6 +67,7 @@ export default function App() {
         sector: next.sector,
         habitacion: next.habitacion,
         cama: next.cama,
+        historiaClinica: next.historiaClinica || '',
       });
       return next;
     });
@@ -68,7 +76,7 @@ export default function App() {
   // Botón rápido: Siguiente Cama (+1)
   const handleNextBed = useCallback(() => {
     const currentBed = parseInt(patient.cama, 10);
-    const nextBed = isNaN(currentBed) ? 1 : currentBed + 1;
+    const nextBed = isNaN(currentBed) ? 1 : Math.min(MAX_BEDS, currentBed + 1);
     handlePatientChange({ cama: String(nextBed) });
     setToast({
       type: 'success',
@@ -101,46 +109,80 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleNextBed, handlePatientChange, patient.cama]);
 
+  // Función para deshacer el último registro guardado
+  const handleUndo = useCallback(
+    (recordId: string, prevPatient: BasePatientData) => {
+      deleteRecordLocally(recordId);
+      reloadData();
+      setPatient(prevPatient);
+      savePatientContextMemory({
+        sector: prevPatient.sector,
+        habitacion: prevPatient.habitacion,
+        cama: prevPatient.cama,
+        historiaClinica: prevPatient.historiaClinica || '',
+      });
+      setToast({
+        type: 'warning',
+        message: `↩️ Registro deshecho. Vuelto a Sec ${prevPatient.sector} Hab ${prevPatient.habitacion} Cama ${prevPatient.cama}`,
+      });
+      haptics.warning();
+    },
+    [reloadData]
+  );
+
   // Guardar Acceso Periférico
   const handleAccesoSubmit = async (formData: AccesoFormType) => {
-    await submitPatientRecord('ACCESO_PERIFERICO', formData);
+    const prevPatient = { ...patient };
+    const res = await submitPatientRecord('ACCESO_PERIFERICO', formData);
     reloadData();
-    setToast({
-      type: 'success',
-      message: `✅ Vía: Sec ${formData.sector} Hab ${formData.habitacion} Cama ${formData.cama} (${formData.tieneAcceso ? 'Con vía' : 'Sin vía'})`,
-    });
+
     // Auto-avanzar cama
     const currentBed = parseInt(patient.cama, 10);
     if (!isNaN(currentBed)) {
-      handlePatientChange({ cama: String(currentBed + 1) });
+      handlePatientChange({ cama: String(Math.min(MAX_BEDS, currentBed + 1)) });
     }
+
+    setToast({
+      type: 'success',
+      message: `✅ Vía: Sec ${formData.sector} Hab ${formData.habitacion} Cama ${formData.cama} (${formData.tieneAcceso ? 'Con vía' : formData.tipoAccesoAlternativo === 'acceso_central' ? 'Acceso Central' : formData.tipoAccesoAlternativo === 'percutaneo' ? 'Percutáneo' : 'Sin vía'})`,
+      action: res.recordId
+        ? {
+            label: 'Deshacer',
+            onClick: () => handleUndo(res.recordId!, prevPatient),
+          }
+        : undefined,
+      durationMs: 5000,
+    });
+
     haptics.success();
   };
 
   // Guardar UPP
   const handleUppSubmit = async (formData: UppFormType) => {
-    await submitPatientRecord('UPP', formData);
+    const prevPatient = { ...patient };
+    const res = await submitPatientRecord('UPP', formData);
     reloadData();
-    setToast({
-      type: 'success',
-      message: `✅ UPP: Sec ${formData.sector} Hab ${formData.habitacion} Cama ${formData.cama} (${formData.tieneUpp ? 'Con UPP' : 'Piel Íntegra'})`,
-    });
+
     // Auto-avanzar cama
     const currentBed = parseInt(patient.cama, 10);
     if (!isNaN(currentBed)) {
-      handlePatientChange({ cama: String(currentBed + 1) });
+      handlePatientChange({ cama: String(Math.min(MAX_BEDS, currentBed + 1)) });
     }
+
+    setToast({
+      type: 'success',
+      message: `✅ UPP: Sec ${formData.sector} Hab ${formData.habitacion} Cama ${formData.cama} (${formData.tieneUpp ? 'Con UPP' : 'Piel Íntegra'})`,
+      action: res.recordId
+        ? {
+            label: 'Deshacer',
+            onClick: () => handleUndo(res.recordId!, prevPatient),
+          }
+        : undefined,
+      durationMs: 5000,
+    });
+
     haptics.success();
   };
-
-  // Nombres recientes de colocadores de vías del turno para sugerencias
-  const recentColocadores = useMemo(() => {
-    const names = records
-      .filter((r) => r.formType === 'ACCESO_PERIFERICO')
-      .map((r) => (r.data as AccesoFormType).rotuloNombre)
-      .filter((n): n is string => Boolean(n && n.trim().length > 0));
-    return Array.from(new Set(names));
-  }, [records]);
 
   const viasRecords = records.filter((r) => r.formType === 'ACCESO_PERIFERICO');
   const uppRecords = records.filter((r) => r.formType === 'UPP');
@@ -197,7 +239,7 @@ export default function App() {
 
       {/* Contenedor Principal: Layout Responsivo de 2 Columnas para Chromebook/PC */}
       <div className="flex-1 w-full max-w-6xl mx-auto p-2 sm:p-4 lg:grid lg:grid-cols-12 lg:gap-5">
-        {/* PANEL IZQUIERDO (Visible en pantallas medianas y Chromebook): Panel de Control de Ronda */}
+        {/* PANEL IZQUIERDO: Panel de Control de Ronda */}
         <aside aria-label="Panel de control del turno" className="hidden lg:block lg:col-span-4 space-y-4">
           {/* Tarjeta de Ronda y Estado del Turno */}
           <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-xs space-y-3">
@@ -278,7 +320,7 @@ export default function App() {
           </div>
         </aside>
 
-        {/* PANEL DERECHO (Principal en móvil y desktop): Formulario Activo y Cabecera */}
+        {/* PANEL DERECHO: Formulario Activo y Cabecera */}
         <main className="lg:col-span-8 flex flex-col space-y-2">
           {/* Selector de Módulo (Visible en móvil / tablet) */}
           <div className="w-full lg:hidden">
@@ -301,6 +343,7 @@ export default function App() {
                 onNextBed={handleNextBed}
                 activeRound={activeTab}
                 totalCensadasHoy={records.length}
+                records={records}
               />
             </div>
           )}
@@ -312,7 +355,6 @@ export default function App() {
                 patient={patient}
                 onSubmit={handleAccesoSubmit}
                 onSwitchToUpp={() => setActiveTab('UPP')}
-                recentColocadores={recentColocadores}
               />
             )}
 

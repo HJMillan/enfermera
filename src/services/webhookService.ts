@@ -13,6 +13,7 @@ export interface SubmitResult {
   message: string;
   savedLocally: boolean;
   syncedToCloud: boolean;
+  recordId?: string;
 }
 
 export async function submitPatientRecord(
@@ -49,53 +50,51 @@ export async function submitPatientRecord(
       message: 'Registro guardado localmente en el dispositivo (sin webhook configurado).',
       savedLocally: true,
       syncedToCloud: false,
-    };
-  }
-
-  // 2. Intentar enviar al Webhook
-  try {
-    const payload = {
-      formType,
-      timestamp,
-      data,
-      rowValues,
-    };
-
-    const response = await fetch(webhookUrl, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: {
-        'Content-Type': 'text/plain;charset=utf-8',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    // En modo no-cors la respuesta es 'opaque' (código 0), lo que indica envío exitoso sin bloqueo de CORS
-    if (response.type === 'opaque' || response.ok) {
-      updateRecordStatus(recordId, 'SYNCED');
-      return {
-        success: true,
-        message: 'Registro sincronizado con éxito con la planilla.',
-        savedLocally: true,
-        syncedToCloud: true,
-      };
-    } else {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-  } catch (error) {
-    console.warn('Fallo al conectar con webhook, conservado en cola local:', error);
-    updateRecordStatus(
       recordId,
-      'FAILED',
-      error instanceof Error ? error.message : 'Error desconocido al sincronizar'
-    );
-    return {
-      success: true,
-      message: 'Guardado en el dispositivo. Se reintentará cuando haya conexión con el webhook.',
-      savedLocally: true,
-      syncedToCloud: false,
     };
   }
+
+  // 2. Despachar sincronización con la nube en segundo plano (Offline-first no bloqueante)
+  void (async () => {
+    try {
+      const payload = {
+        formType,
+        timestamp,
+        data,
+        rowValues,
+      };
+
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.type === 'opaque' || response.ok) {
+        updateRecordStatus(recordId, 'SYNCED');
+      } else {
+        updateRecordStatus(recordId, 'FAILED', `HTTP ${response.status}`);
+      }
+    } catch (error) {
+      console.warn('Fallo al conectar con webhook en segundo plano, conservado en cola local:', error);
+      updateRecordStatus(
+        recordId,
+        'FAILED',
+        error instanceof Error ? error.message : 'Error desconocido al sincronizar'
+      );
+    }
+  })();
+
+  return {
+    success: true,
+    message: 'Registro guardado localmente con éxito.',
+    savedLocally: true,
+    syncedToCloud: false,
+    recordId,
+  };
 }
 
 export async function retryRecordSync(record: StoredRecord): Promise<boolean> {

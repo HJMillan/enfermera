@@ -1,5 +1,6 @@
 /**
- * PLANILLA ENFERMERA - Google Apps Script
+ * PLANILLA ENFERMERA - Google Apps Script (Versión de Producción)
+ * 
  * Endpoint Webhook para inserción automática en Google Sheets y
  * despacho de reporte de Cierre de Turno por Correo Electrónico.
  * 
@@ -7,11 +8,61 @@
  * - jesusmillan86@gmail.com
  * - pamelaestua91@gmail.com
  * 
- * FORMATO DE FECHA: Español estándar (dd/MM/yyyy HH:mm)
+ * FORMATO DE FECHA: Español estándar (dd/MM/yyyy HH:mm) - America/Argentina/Buenos_Aires
  */
+
+// Si el script está vinculado al Sheet (Extensiones > Apps Script), dejar vacío ('').
+// Si se utiliza como script independiente (standalone), colocar el ID de la hoja de cálculo:
+var SPREADSHEET_ID = '';
 
 var DEFAULT_RECIPIENTS = ['jesusmillan86@gmail.com', 'pamelaestua91@gmail.com'];
 
+// Cabeceras oficiales sincronizadas 1:1 con sheetMapper.ts
+var HEADERS_ACCESO_PERIFERICO = [
+  'Fecha/Hora', 'Sector', 'Habitación', 'Cama', 'HC',
+  'Cant. Enfermeras', 'Cant. Auxiliares',
+  'Acceso (SI)', 'Acceso (NO)', 'Tipo Acceso Alt.', 'Acceso Central Ubic.',
+  'Cantidad', 'MSD', 'MSI', 'MII', 'MID',
+  'Rótulo (SI/NO)', 'Rótulo Fecha', 'Rótulo Nombre', 'Rótulo Legajo',
+  'Rótulo Enfermero', 'Rótulo Turno', 'Rótulo ABB',
+  'Visibilidad (SI)', 'Visibilidad (NO)',
+  'Tegaderm', 'Cinta', 'Tipo Cinta', 'Hipafix', 'Venda', 'Contención Mec.',
+  'Adherencia', 'Llave 3 Vías', 'Tapón Multif.',
+  'Infiltración', 'Eritematoso', 'Retorno', 'Infusión',
+  'Mail Enviado'
+];
+
+var HEADERS_UPP = [
+  'Fecha/Hora', 'Sector', 'Habitación', 'Cama', 'HC',
+  'Cant. Enfermeras', 'Cant. Auxiliares',
+  'Fecha Ingreso', 'Área Cerrada',
+  'UPP (SI)', 'UPP (NO)', 'Cantidad',
+  'Sacra', 'Talón', 'Glúteo', 'Posterior', 'Otro',
+  'Grado I', 'Grado II', 'Grado III', 'Grado IV',
+  'Tratamiento (SI/NO)', 'Tipo Tratamiento', 'Detalle',
+  'Disp. Apoyo (SI/NO)', 'Disp. Aro', 'Disp. Guantes Agua', 'Disp. Otro',
+  'Escala Braden', 'Oral', 'NPT', 'Enteral SN', 'Enteral BG',
+  'Colchón (SI)', 'Colchón (NO)', 'Obs Colchón',
+  'Mail Enviado'
+];
+
+/**
+ * Obtiene la referencia a la Hoja de Cálculo activa o por ID
+ */
+function getSpreadsheet() {
+  if (SPREADSHEET_ID && SPREADSHEET_ID.trim() !== '') {
+    return SpreadsheetApp.openById(SPREADSHEET_ID.trim());
+  }
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) {
+    throw new Error('No se encontró una Hoja de Cálculo activa. Si el script no está dentro de la hoja (Extensiones > Apps Script), configura la variable SPREADSHEET_ID.');
+  }
+  return ss;
+}
+
+/**
+ * Manejador principal de peticiones POST (Webhook desde la App)
+ */
 function doPost(e) {
   try {
     var contents = e.postData ? e.postData.contents : '';
@@ -33,69 +84,121 @@ function doPost(e) {
     var formType = payload.formType; // 'ACCESO_PERIFERICO' o 'UPP'
     var rowValues = payload.rowValues || [];
     
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheetName = formType === 'ACCESO_PERIFERICO' ? 'Acceso Periférico' : 'UPP';
-    var sheet = ss.getSheetByName(sheetName);
+    var ss = getSpreadsheet();
+    var isVias = formType === 'ACCESO_PERIFERICO';
+    var sheetName = isVias ? 'Acceso Periférico' : 'UPP';
+    var expectedHeaders = isVias ? HEADERS_ACCESO_PERIFERICO : HEADERS_UPP;
     
-    // Si la hoja no existe, la creamos y colocamos las cabeceras con la columna de control 'Mail Enviado'
-    if (!sheet) {
-      sheet = ss.insertSheet(sheetName);
-      if (formType === 'ACCESO_PERIFERICO') {
-        sheet.appendRow([
-          'Fecha/Hora', 'Sector', 'Habitación', 'Cama',
-          'Acceso (SI)', 'Acceso (NO)', 'Cantidad',
-          'MSD', 'MSI', 'MII', 'MID',
-          'Rótulo Fecha', 'ABB (S/N)', 'Rótulo Nombre', 'Legajo', 'Turno',
-          'Visibilidad (SI)', 'Visibilidad (NO)',
-          'Tegaderm', 'Cinta', 'Hipafix', 'Venda', 'Contención Mec.',
-          'Adherencia', 'Llave 3 Vías', 'Tapón Multif.',
-          'Infiltración', 'Eritematoso', 'Retorno', 'Infusión',
-          'Mail Enviado'
-        ]);
-      } else {
-        sheet.appendRow([
-          'Fecha/Hora', 'Sector', 'Habitación', 'Cama',
-          'UPP (SI)', 'UPP (NO)', 'Cantidad',
-          'Sacra', 'Talón', 'Glúteo', 'Posterior', 'Otro',
-          'Grado', 'Tratamiento (SI/NO)', 'Tipo Tratamiento', 'Detalle',
-          'Escala Braden', 'Oral', 'NPT', 'Enteral SN', 'Enteral BG',
-          'Colchón (SI)', 'Colchón (NO)', 'Obs Colchón',
-          'Mail Enviado'
-        ]);
-      }
-      sheet.getRange(1, 1, 1, sheet.getLastColumn()).setFontWeight('bold').setBackground('#e0f2fe');
-      sheet.setFrozenRows(1);
-    } else {
-      // Verificar que la última columna sea 'Mail Enviado'
-      var lastCol = sheet.getLastColumn();
-      var headerVal = sheet.getRange(1, lastCol).getValue();
-      if (headerVal !== 'Mail Enviado') {
-        sheet.getRange(1, lastCol + 1).setValue('Mail Enviado').setFontWeight('bold').setBackground('#e0f2fe');
-      }
-    }
+    // Asegurar que la hoja exista y tenga los encabezados correspondientes
+    var sheet = ensureSheetWithHeaders(ss, sheetName, expectedHeaders);
     
-    // Asegurar que el registro nuevo ingrese con 'NO' en Mail Enviado
-    var expectedBaseLength = formType === 'ACCESO_PERIFERICO' ? 30 : 24;
+    // Asegurar que el tamaño base de la fila coincida con los datos (sin Mail Enviado)
+    var expectedBaseLength = expectedHeaders.length - 1; // 38 para vías, 36 para UPP
     while (rowValues.length < expectedBaseLength) {
       rowValues.push('');
     }
-    rowValues.push('NO'); // Columna Mail Enviado
+    
+    // Columna 'Mail Enviado' inicia con 'NO'
+    rowValues[expectedBaseLength] = 'NO';
+    
+    // Forzar que Cama, Habitación y HC se almacenen como texto para no truncar ceros
+    if (rowValues[2] !== undefined && rowValues[2] !== '') rowValues[2] = String(rowValues[2]);
+    if (rowValues[3] !== undefined && rowValues[3] !== '') rowValues[3] = String(rowValues[3]);
+    if (rowValues[4] !== undefined && rowValues[4] !== '') rowValues[4] = String(rowValues[4]);
     
     sheet.appendRow(rowValues);
     
-    return jsonResponse({ status: 'success', message: 'Fila agregada correctamente a ' + sheetName });
+    return jsonResponse({
+      status: 'success',
+      message: 'Fila agregada correctamente a ' + sheetName,
+      rowNumber: sheet.getLastRow()
+    });
       
   } catch (error) {
     return jsonResponse({ status: 'error', message: error.toString() });
   }
 }
 
+/**
+ * Health check para peticiones GET
+ */
 function doGet() {
+  var ss = null;
+  var ssTitle = 'No vinculado';
+  try {
+    ss = getSpreadsheet();
+    ssTitle = ss.getName();
+  } catch (e) {
+    ssTitle = 'Error: ' + e.message;
+  }
+
   return jsonResponse({ 
     status: 'online', 
-    service: 'Planilla Enfermera Webhook Activo',
-    destinatarios: DEFAULT_RECIPIENTS 
+    service: 'Planilla Enfermera Webhook Activo (Producción)',
+    spreadsheet: ssTitle,
+    destinatarios: DEFAULT_RECIPIENTS,
+    servidores: 'Google Apps Script / V8 Engine'
   });
+}
+
+/**
+ * Asegura la existencia de la hoja y garantiza cabeceras completas
+ */
+function ensureSheetWithHeaders(ss, sheetName, expectedHeaders) {
+  var sheet = ss.getSheetByName(sheetName);
+  
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    sheet.appendRow(expectedHeaders);
+    sheet.getRange(1, 1, 1, expectedHeaders.length)
+      .setFontWeight('bold')
+      .setBackground('#e0f2fe');
+    sheet.setFrozenRows(1);
+    sheet.getRange('C:E').setNumberFormat('@');
+    return sheet;
+  }
+  
+  // Si la hoja está completamente vacía
+  if (sheet.getLastRow() === 0 || sheet.getLastColumn() === 0) {
+    sheet.appendRow(expectedHeaders);
+    sheet.getRange(1, 1, 1, expectedHeaders.length)
+      .setFontWeight('bold')
+      .setBackground('#e0f2fe');
+    sheet.setFrozenRows(1);
+    sheet.getRange('C:E').setNumberFormat('@');
+    return sheet;
+  }
+  
+  // Si ya tiene columnas, verificar si las cabeceras están completas
+  var lastCol = sheet.getLastColumn();
+  var currentHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  
+  // Si le faltan columnas o no tiene 'Mail Enviado'
+  if (currentHeaders.length < expectedHeaders.length) {
+    for (var c = currentHeaders.length; c < expectedHeaders.length; c++) {
+      sheet.getRange(1, c + 1)
+        .setValue(expectedHeaders[c])
+        .setFontWeight('bold')
+        .setBackground('#e0f2fe');
+    }
+  }
+  
+  return sheet;
+}
+
+/**
+ * Busca dinámicamente el índice 0-based de una columna por su nombre de encabezado
+ */
+function findColumnIndex(sheet, headerName) {
+  if (!sheet || sheet.getLastColumn() === 0) return -1;
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var target = headerName.trim().toLowerCase();
+  for (var i = 0; i < headers.length; i++) {
+    if (String(headers[i]).trim().toLowerCase() === target) {
+      return i; // 0-based
+    }
+  }
+  return -1;
 }
 
 /**
@@ -103,7 +206,7 @@ function doGet() {
  * arma el resumen clínico, envía el email y marca las filas como enviadas.
  */
 function enviarReporteTurno(recipients) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = getSpreadsheet();
   var sheetVias = ss.getSheetByName('Acceso Periférico');
   var sheetUpp = ss.getSheetByName('UPP');
   
@@ -112,16 +215,21 @@ function enviarReporteTurno(recipients) {
   var viasRowIndexes = [];
   var uppRowIndexes = [];
   
-  // 1. Recorrer Vías usando getDisplayValues() para respetar formato de fecha en español
+  var colMailVias = -1;
+  var colMailUpp = -1;
+  
+  // 1. Recorrer Vías
   if (sheetVias && sheetVias.getLastRow() > 1) {
+    colMailVias = findColumnIndex(sheetVias, 'Mail Enviado');
+    if (colMailVias === -1) colMailVias = sheetVias.getLastColumn() - 1;
+    
     var lastRowVias = sheetVias.getLastRow();
     var lastColVias = sheetVias.getLastColumn();
     var valuesVias = sheetVias.getRange(2, 1, lastRowVias - 1, lastColVias).getDisplayValues();
-    var colStatusIndex = lastColVias - 1; // índice 0-based
     
     for (var i = 0; i < valuesVias.length; i++) {
       var row = valuesVias[i];
-      var status = String(row[colStatusIndex] || '').toUpperCase().trim();
+      var status = String(row[colMailVias] || '').toUpperCase().trim();
       if (!status.startsWith('SI')) {
         pendingVias.push(row);
         viasRowIndexes.push(i + 2); // Fila real 1-based
@@ -129,16 +237,18 @@ function enviarReporteTurno(recipients) {
     }
   }
   
-  // 2. Recorrer UPP usando getDisplayValues()
+  // 2. Recorrer UPP
   if (sheetUpp && sheetUpp.getLastRow() > 1) {
+    colMailUpp = findColumnIndex(sheetUpp, 'Mail Enviado');
+    if (colMailUpp === -1) colMailUpp = sheetUpp.getLastColumn() - 1;
+    
     var lastRowUpp = sheetUpp.getLastRow();
     var lastColUpp = sheetUpp.getLastColumn();
     var valuesUpp = sheetUpp.getRange(2, 1, lastRowUpp - 1, lastColUpp).getDisplayValues();
-    var colStatusIndexUpp = lastColUpp - 1;
     
     for (var j = 0; j < valuesUpp.length; j++) {
       var rowU = valuesUpp[j];
-      var statusU = String(rowU[colStatusIndexUpp] || '').toUpperCase().trim();
+      var statusU = String(rowU[colMailUpp] || '').toUpperCase().trim();
       if (!statusU.startsWith('SI')) {
         pendingUpp.push(rowU);
         uppRowIndexes.push(j + 2);
@@ -150,7 +260,7 @@ function enviarReporteTurno(recipients) {
   if (totalPending === 0) {
     return jsonResponse({
       status: 'success',
-      message: 'No hay registros pendientes de envío. Todos los pacientes ya fueron reportados previamente.',
+      message: 'No hay registros pendientes de envío. Todos los pacientes del turno ya fueron reportados previamente.',
       count: 0
     });
   }
@@ -159,19 +269,23 @@ function enviarReporteTurno(recipients) {
   var viasConAlerta = 0;
   var viasSinAcceso = 0;
   var viasConAcceso = 0;
+  var viasCentral = 0;
+  var viasPercutaneo = 0;
   
   for (var v = 0; v < pendingVias.length; v++) {
     var rV = pendingVias[v];
-    var tieneAcceso = rV[4] === 'SI';
+    var tieneAcceso = rV[7] === 'SI';
     if (tieneAcceso) {
       viasConAcceso++;
-      var infiltracion = rV[26] === 'SI';
-      var eritematoso = rV[27] === 'SI';
+      var infiltracion = rV[34] === 'SI';
+      var eritematoso = rV[35] === 'SI';
       if (infiltracion || eritematoso) {
         viasConAlerta++;
       }
     } else {
       viasSinAcceso++;
+      if (rV[9] === 'acceso_central') viasCentral++;
+      if (rV[9] === 'percutaneo') viasPercutaneo++;
     }
   }
   
@@ -179,7 +293,7 @@ function enviarReporteTurno(recipients) {
   var uppSinLesion = 0;
   for (var u = 0; u < pendingUpp.length; u++) {
     var rU = pendingUpp[u];
-    var tieneU = rU[4] === 'SI';
+    var tieneU = rU[9] === 'SI';
     if (tieneU) {
       uppConLesion++;
     } else {
@@ -187,40 +301,40 @@ function enviarReporteTurno(recipients) {
     }
   }
   
-  // 4. Construir cuerpo del Correo en HTML profesional (Fecha en español dd/MM/yyyy HH:mm)
+  // 4. Construir cuerpo del Correo en HTML profesional
   var fechaHoy = Utilities.formatDate(new Date(), 'America/Argentina/Buenos_Aires', 'dd/MM/yyyy HH:mm');
   var subject = '[Reporte Enfermería] Cierre de Turno - ' + fechaHoy + ' (' + totalPending + ' registros)';
   
-  var html = '<div style="font-family: Arial, sans-serif; max-width: 720px; margin: auto; padding: 20px; color: #1e293b; background-color: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">';
+  var html = '<div style="font-family: Arial, sans-serif; max-width: 760px; margin: auto; padding: 20px; color: #1e293b; background-color: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">';
   html += '<div style="background-color: #0369a1; padding: 18px; border-radius: 8px; color: #ffffff; text-align: center;">';
   html += '<h2 style="margin: 0; font-size: 20px;">🏥 Reporte de Relevamiento de Enfermería</h2>';
-  html += '<p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.9;">Cierre de Turno / Registros Pendientes Despachados</p>';
+  html += '<p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.9;">Cierre de Turno / Registros Despachados</p>';
   html += '</div>';
   
   html += '<p style="margin-top: 16px; font-size: 14px;"><b>Fecha de Emisión:</b> ' + fechaHoy + ' hs</p>';
   html += '<p style="font-size: 13px; color: #64748b;">Se adjunta el reporte consolidado de los pacientes relevados que estaban pendientes de envío.</p>';
   
   // Tarjetas de Métricas
-  html += '<div style="display: flex; gap: 10px; margin: 16px 0; text-align: center;">';
+  html += '<div style="display: flex; gap: 8px; margin: 16px 0; text-align: center; flex-wrap: wrap;">';
   
-  html += '<div style="flex: 1; background: #ffffff; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1;">';
-  html += '<div style="font-size: 24px; font-weight: bold; color: #0284c7;">' + totalPending + '</div>';
-  html += '<div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Total Registros</div>';
+  html += '<div style="flex: 1; min-width: 100px; background: #ffffff; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1;">';
+  html += '<div style="font-size: 22px; font-weight: bold; color: #0284c7;">' + totalPending + '</div>';
+  html += '<div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Total Registros</div>';
   html += '</div>';
   
-  html += '<div style="flex: 1; background: #ffffff; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1;">';
-  html += '<div style="font-size: 24px; font-weight: bold; color: #059669;">' + viasConAcceso + '</div>';
-  html += '<div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Vías Activas</div>';
+  html += '<div style="flex: 1; min-width: 100px; background: #ffffff; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1;">';
+  html += '<div style="font-size: 22px; font-weight: bold; color: #059669;">' + viasConAcceso + '</div>';
+  html += '<div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Vías Activas</div>';
   html += '</div>';
   
-  html += '<div style="flex: 1; background: #ffffff; padding: 12px; border-radius: 8px; border: 1px solid ' + (viasConAlerta > 0 ? '#fca5a5' : '#cbd5e1') + '; background-color: ' + (viasConAlerta > 0 ? '#fef2f2' : '#ffffff') + ';">';
-  html += '<div style="font-size: 24px; font-weight: bold; color: ' + (viasConAlerta > 0 ? '#dc2626' : '#64748b') + ';">' + viasConAlerta + '</div>';
-  html += '<div style="font-size: 11px; color: ' + (viasConAlerta > 0 ? '#dc2626' : '#64748b') + '; text-transform: uppercase;">Alertas Vía</div>';
+  html += '<div style="flex: 1; min-width: 100px; background: #ffffff; padding: 12px; border-radius: 8px; border: 1px solid ' + (viasConAlerta > 0 ? '#fca5a5' : '#cbd5e1') + '; background-color: ' + (viasConAlerta > 0 ? '#fef2f2' : '#ffffff') + ';">';
+  html += '<div style="font-size: 22px; font-weight: bold; color: ' + (viasConAlerta > 0 ? '#dc2626' : '#64748b') + ';">' + viasConAlerta + '</div>';
+  html += '<div style="font-size: 10px; color: ' + (viasConAlerta > 0 ? '#dc2626' : '#64748b') + '; text-transform: uppercase;">Alertas Vía</div>';
   html += '</div>';
   
-  html += '<div style="flex: 1; background: #ffffff; padding: 12px; border-radius: 8px; border: 1px solid ' + (uppConLesion > 0 ? '#fcd34d' : '#cbd5e1') + '; background-color: ' + (uppConLesion > 0 ? '#fffbeb' : '#ffffff') + ';">';
-  html += '<div style="font-size: 24px; font-weight: bold; color: ' + (uppConLesion > 0 ? '#d97706' : '#64748b') + ';">' + uppConLesion + '</div>';
-  html += '<div style="font-size: 11px; color: ' + (uppConLesion > 0 ? '#d97706' : '#64748b') + '; text-transform: uppercase;">UPP Activas</div>';
+  html += '<div style="flex: 1; min-width: 100px; background: #ffffff; padding: 12px; border-radius: 8px; border: 1px solid ' + (uppConLesion > 0 ? '#fcd34d' : '#cbd5e1') + '; background-color: ' + (uppConLesion > 0 ? '#fffbeb' : '#ffffff') + ';">';
+  html += '<div style="font-size: 22px; font-weight: bold; color: ' + (uppConLesion > 0 ? '#d97706' : '#64748b') + ';">' + uppConLesion + '</div>';
+  html += '<div style="font-size: 10px; color: ' + (uppConLesion > 0 ? '#d97706' : '#64748b') + '; text-transform: uppercase;">UPP Activas</div>';
   html += '</div>';
   
   html += '</div>';
@@ -233,35 +347,49 @@ function enviarReporteTurno(recipients) {
     html += '<th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Fecha/Hora</th>';
     html += '<th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Sector</th>';
     html += '<th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Hab/Cama</th>';
-    html += '<th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Vía</th>';
+    html += '<th style="padding: 6px 8px; border: 1px solid #e2e8f0;">HC</th>';
+    html += '<th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Estado Acceso</th>';
     html += '<th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Ubicación</th>';
-    html += '<th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Enfermero / Legajo</th>';
-    html += '<th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Estado / Signos</th>';
+    html += '<th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Rótulo</th>';
+    html += '<th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Alertas</th>';
     html += '</tr>';
     
     for (var pv = 0; pv < pendingVias.length; pv++) {
       var rowP = pendingVias[pv];
-      var hasV = rowP[4] === 'SI';
-      var ubic = '';
-      if (rowP[7] === 'SI') ubic = 'MSD';
-      else if (rowP[8] === 'SI') ubic = 'MSI';
-      else if (rowP[9] === 'SI') ubic = 'MII';
-      else if (rowP[10] === 'SI') ubic = 'MID';
+      var hasV = rowP[7] === 'SI';
+      var ubicList = [];
+      if (rowP[12] === 'SI') ubicList.push('MSD');
+      if (rowP[13] === 'SI') ubicList.push('MSI');
+      if (rowP[14] === 'SI') ubicList.push('MII');
+      if (rowP[15] === 'SI') ubicList.push('MID');
       
-      var enf = (rowP[13] || '-') + ' (' + (rowP[14] || '-') + ')';
+      var estadoAcceso = '';
+      if (hasV) {
+        estadoAcceso = 'Con Vía (' + rowP[11] + ')';
+      } else if (rowP[9] === 'acceso_central') {
+        estadoAcceso = 'Central (' + (rowP[10] || 'S/D') + ')';
+      } else if (rowP[9] === 'percutaneo') {
+        estadoAcceso = 'Percutáneo';
+      } else {
+        estadoAcceso = 'Sin Acceso';
+      }
+      
+      var rotuloInfo = rowP[16] === 'SI' ? 'SÍ' : (rowP[16] === 'NO' ? 'NO' : '-');
+      
       var alerta = '';
-      if (rowP[26] === 'SI') alerta += '<span style="color:#dc2626; font-weight:bold;">Infiltración! </span>';
-      if (rowP[27] === 'SI') alerta += '<span style="color:#dc2626; font-weight:bold;">Eritematoso! </span>';
+      if (rowP[34] === 'SI') alerta += '<span style="color:#dc2626; font-weight:bold;">Infiltración! </span>';
+      if (rowP[35] === 'SI') alerta += '<span style="color:#dc2626; font-weight:bold;">Eritematoso! </span>';
       if (!alerta && hasV) alerta = '<span style="color:#059669;">Normal</span>';
-      if (!hasV) alerta = '<span style="color:#64748b;">Sin acceso</span>';
+      if (!hasV) alerta = '<span style="color:#64748b;">-</span>';
       
       html += '<tr>';
       html += '<td style="padding: 6px 8px; border: 1px solid #e2e8f0; font-family: monospace;">' + rowP[0] + '</td>';
       html += '<td style="padding: 6px 8px; border: 1px solid #e2e8f0;">' + rowP[1] + '</td>';
       html += '<td style="padding: 6px 8px; border: 1px solid #e2e8f0;"><b>' + rowP[2] + '</b> - ' + rowP[3] + '</td>';
-      html += '<td style="padding: 6px 8px; border: 1px solid #e2e8f0;">' + (hasV ? 'SI (' + rowP[6] + ')' : 'NO') + '</td>';
-      html += '<td style="padding: 6px 8px; border: 1px solid #e2e8f0;">' + (ubic || '-') + '</td>';
-      html += '<td style="padding: 6px 8px; border: 1px solid #e2e8f0;">' + enf + '</td>';
+      html += '<td style="padding: 6px 8px; border: 1px solid #e2e8f0;">' + (rowP[4] || '-') + '</td>';
+      html += '<td style="padding: 6px 8px; border: 1px solid #e2e8f0;">' + estadoAcceso + '</td>';
+      html += '<td style="padding: 6px 8px; border: 1px solid #e2e8f0;">' + (ubicList.join(', ') || '-') + '</td>';
+      html += '<td style="padding: 6px 8px; border: 1px solid #e2e8f0;">' + rotuloInfo + '</td>';
       html += '<td style="padding: 6px 8px; border: 1px solid #e2e8f0;">' + alerta + '</td>';
       html += '</tr>';
     }
@@ -276,23 +404,36 @@ function enviarReporteTurno(recipients) {
     html += '<th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Fecha/Hora</th>';
     html += '<th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Sector</th>';
     html += '<th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Hab/Cama</th>';
+    html += '<th style="padding: 6px 8px; border: 1px solid #e2e8f0;">HC</th>';
     html += '<th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Tiene UPP</th>';
-    html += '<th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Grado</th>';
+    html += '<th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Grados</th>';
     html += '<th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Tratamiento</th>';
+    html += '<th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Disp. Apoyo</th>';
     html += '<th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Braden</th>';
     html += '</tr>';
     
     for (var pu = 0; pu < pendingUpp.length; pu++) {
       var rowU2 = pendingUpp[pu];
-      var hasU = rowU2[4] === 'SI';
+      var hasU = rowU2[9] === 'SI';
+      
+      var grados = [];
+      if (rowU2[17] === 'SI') grados.push('I');
+      if (rowU2[18] === 'SI') grados.push('II');
+      if (rowU2[19] === 'SI') grados.push('III');
+      if (rowU2[20] === 'SI') grados.push('IV');
+      
+      var dispApoyo = rowU2[24] === 'SI' ? 'SÍ' : (rowU2[24] === 'NO' ? 'NO' : '-');
+      
       html += '<tr>';
       html += '<td style="padding: 6px 8px; border: 1px solid #e2e8f0; font-family: monospace;">' + rowU2[0] + '</td>';
       html += '<td style="padding: 6px 8px; border: 1px solid #e2e8f0;">' + rowU2[1] + '</td>';
       html += '<td style="padding: 6px 8px; border: 1px solid #e2e8f0;"><b>' + rowU2[2] + '</b> - ' + rowU2[3] + '</td>';
-      html += '<td style="padding: 6px 8px; border: 1px solid #e2e8f0;">' + (hasU ? '<span style="color:#d97706; font-weight:bold;">SI (' + rowU2[6] + ')</span>' : 'NO') + '</td>';
-      html += '<td style="padding: 6px 8px; border: 1px solid #e2e8f0;">' + (rowU2[12] || '-') + '</td>';
-      html += '<td style="padding: 6px 8px; border: 1px solid #e2e8f0;">' + (rowU2[14] || '-') + '</td>';
-      html += '<td style="padding: 6px 8px; border: 1px solid #e2e8f0;">' + (rowU2[16] || '-') + '</td>';
+      html += '<td style="padding: 6px 8px; border: 1px solid #e2e8f0;">' + (rowU2[4] || '-') + '</td>';
+      html += '<td style="padding: 6px 8px; border: 1px solid #e2e8f0;">' + (hasU ? '<span style="color:#d97706; font-weight:bold;">SI (' + rowU2[11] + ')</span>' : 'NO') + '</td>';
+      html += '<td style="padding: 6px 8px; border: 1px solid #e2e8f0;">' + (grados.join(', ') || '-') + '</td>';
+      html += '<td style="padding: 6px 8px; border: 1px solid #e2e8f0;">' + (rowU2[22] || '-') + '</td>';
+      html += '<td style="padding: 6px 8px; border: 1px solid #e2e8f0;">' + dispApoyo + '</td>';
+      html += '<td style="padding: 6px 8px; border: 1px solid #e2e8f0;">' + (rowU2[28] || '-') + '</td>';
       html += '</tr>';
     }
     html += '</table>';
@@ -303,7 +444,7 @@ function enviarReporteTurno(recipients) {
   html += '</div>';
   html += '</div>';
   
-  // 5. Crear archivo CSV adjunto con los datos completos formateados en español
+  // 5. Crear archivo CSV adjunto
   var csvLines = [];
   if (pendingVias.length > 0) {
     csvLines.push('--- ACCESO PERIFERICO ---');
@@ -334,20 +475,22 @@ function enviarReporteTurno(recipients) {
     attachments: [csvBlob]
   });
   
-  // 7. Marcar las filas enviadas con 'SI' en Google Sheets para evitar duplicación
+  // 7. Marcar las filas enviadas con 'SI' en Google Sheets de forma segura
   var timeMark = 'SI (' + fechaHoy + ')';
   if (sheetVias && viasRowIndexes.length > 0) {
-    var lastColV = sheetVias.getLastColumn();
+    var mailColV = (colMailVias !== -1 ? colMailVias : sheetVias.getLastColumn() - 1) + 1;
     for (var idxV = 0; idxV < viasRowIndexes.length; idxV++) {
-      sheetVias.getRange(viasRowIndexes[idxV], lastColV).setValue(timeMark);
+      sheetVias.getRange(viasRowIndexes[idxV], mailColV).setValue(timeMark);
     }
   }
   if (sheetUpp && uppRowIndexes.length > 0) {
-    var lastColU = sheetUpp.getLastColumn();
+    var mailColU = (colMailUpp !== -1 ? colMailUpp : sheetUpp.getLastColumn() - 1) + 1;
     for (var idxU = 0; idxU < uppRowIndexes.length; idxU++) {
-      sheetUpp.getRange(uppRowIndexes[idxU], lastColU).setValue(timeMark);
+      sheetUpp.getRange(uppRowIndexes[idxU], mailColU).setValue(timeMark);
     }
   }
+  
+  SpreadsheetApp.flush();
   
   return jsonResponse({
     status: 'success',
@@ -358,12 +501,7 @@ function enviarReporteTurno(recipients) {
   });
 }
 
-function verificarYEnviarPendientesAutomatico() {
-  enviarReporteTurno(DEFAULT_RECIPIENTS);
-}
-
 function escapeCsv(val) {
-  // Si viniera algún objeto Date, forzamos formato dd/MM/yyyy HH:mm
   if (val instanceof Date) {
     var hours = val.getHours();
     var mins = val.getMinutes();
@@ -381,4 +519,107 @@ function jsonResponse(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ---------------------------------------------------------------------------
+// MENÚ DE GOOGLE SHEETS & TRIGGERS
+// ---------------------------------------------------------------------------
+
+/**
+ * Agrega el menú interactivo cuando un usuario abre la Hoja de Cálculo
+ */
+function onOpen() {
+  var ui = SpreadsheetApp.getUi();
+  ui.createMenu('🏥 Planilla Enfermera')
+    .addItem('📧 Despachar Reporte de Turno por Mail', 'menuDespacharReporte')
+    .addItem('🛠️ Verificar / Inicializar Hojas y Cabeceras', 'menuInicializarHojas')
+    .addItem('📊 Ver Estado de Registros Pendientes', 'menuVerPendientes')
+    .addSeparator()
+    .addItem('⏰ Programar Envío Automático Diario (16:00 hs)', 'menuCrearDisparadorDiario')
+    .addToUi();
+}
+
+function menuDespacharReporte() {
+  var ui = SpreadsheetApp.getUi();
+  var resp = ui.alert(
+    'Cierre de Turno',
+    '¿Deseas enviar por correo el reporte consolidado de los registros pendientes a:\n' + DEFAULT_RECIPIENTS.join(', ') + '?',
+    ui.ButtonSet.YES_NO
+  );
+  if (resp === ui.Button.YES) {
+    var result = JSON.parse(enviarReporteTurno(DEFAULT_RECIPIENTS).getContent());
+    ui.alert(result.status === 'success' ? 'Éxito' : 'Atención', result.message, ui.ButtonSet.OK);
+  }
+}
+
+function menuInicializarHojas() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = getSpreadsheet();
+  ensureSheetWithHeaders(ss, 'Acceso Periférico', HEADERS_ACCESO_PERIFERICO);
+  ensureSheetWithHeaders(ss, 'UPP', HEADERS_UPP);
+  ui.alert('Configuración Completa', 'Las hojas "Acceso Periférico" y "UPP" han sido verificadas con sus cabeceras oficiales y formato de texto.', ui.ButtonSet.OK);
+}
+
+function menuVerPendientes() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = getSpreadsheet();
+  var sheetVias = ss.getSheetByName('Acceso Periférico');
+  var sheetUpp = ss.getSheetByName('UPP');
+  
+  var pendV = 0;
+  var pendU = 0;
+  
+  if (sheetVias && sheetVias.getLastRow() > 1) {
+    var cV = findColumnIndex(sheetVias, 'Mail Enviado');
+    if (cV !== -1) {
+      var valsV = sheetVias.getRange(2, cV + 1, sheetVias.getLastRow() - 1, 1).getValues();
+      for (var i = 0; i < valsV.length; i++) {
+        if (!String(valsV[i][0]).toUpperCase().startsWith('SI')) pendV++;
+      }
+    }
+  }
+  
+  if (sheetUpp && sheetUpp.getLastRow() > 1) {
+    var cU = findColumnIndex(sheetUpp, 'Mail Enviado');
+    if (cU !== -1) {
+      var valsU = sheetUpp.getRange(2, cU + 1, sheetUpp.getLastRow() - 1, 1).getValues();
+      for (var j = 0; j < valsU.length; j++) {
+        if (!String(valsU[j][0]).toUpperCase().startsWith('SI')) pendU++;
+      }
+    }
+  }
+  
+  ui.alert(
+    'Registros Pendientes de Envío',
+    '• Vías Periféricas: ' + pendV + ' pendientes\n' +
+    '• UPP: ' + pendU + ' pendientes\n' +
+    'Total: ' + (pendV + pendU) + ' registros.',
+    ui.ButtonSet.OK
+  );
+}
+
+function menuCrearDisparadorDiario() {
+  var ui = SpreadsheetApp.getUi();
+  
+  // Eliminar disparadores previos de esta función para evitar duplicados
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'verificarYEnviarPendientesAutomatico') {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  
+  // Crear disparador todos los días entre 16:00 y 17:00 hs
+  ScriptApp.newTrigger('verificarYEnviarPendientesAutomatico')
+    .timeBased()
+    .everyDays(1)
+    .atHour(16)
+    .inTimezone('America/Argentina/Buenos_Aires')
+    .create();
+    
+  ui.alert('Disparador Programado', 'Se ha programado el envío automático diario para las 16:00 hs (Fin del turno 8-16hs).', ui.ButtonSet.OK);
+}
+
+function verificarYEnviarPendientesAutomatico() {
+  enviarReporteTurno(DEFAULT_RECIPIENTS);
 }

@@ -1,129 +1,172 @@
 import type { AccesoPerifericoForm, UppForm } from '../types/form';
 
-// Cabeceras exactas para la hoja Acceso Periférico
+// Cabeceras para la hoja Acceso Periférico (38 columnas)
 export const ACCESO_PERIFERICO_HEADERS = [
   'Fecha/Hora',          // A
   'Sector',              // B
   'Habitación',          // C
   'Cama',                // D
-  'Acceso (SI)',         // E
-  'Acceso (NO)',         // F
-  'Cantidad',            // G
-  'Ubicación MSD',       // H
-  'Ubicación MSI',       // I
-  'Ubicación MII',       // J
-  'Ubicación MID',       // K
-  'Rótulo Fecha',        // L
-  'Rótulo ABB',          // M
-  'Rótulo Nombre',       // N
-  'Rótulo Legajo',       // O
-  'Rótulo Turno',        // P
-  'Visibilidad (SI)',    // Q
-  'Visibilidad (NO)',    // R
-  'Fijación Tegaderm',   // S
-  'Fijación Cinta',      // T
-  'Fijación Hipafix',    // U
-  'Fijación Venda',      // V
-  'Fijación Contención', // W
-  'Adherencia',          // X
-  'Llave 3 Vías',        // Y
-  'Tapón Multifunción',  // Z
-  'Infiltración',        // AA
-  'Eritematoso',         // AB
-  'Retorno',             // AC
-  'Infusión Tipo'        // AD
+  'HC',                  // E
+  'Cant. Enfermeras',    // F
+  'Cant. Auxiliares',    // G
+  'Acceso (SI)',         // H
+  'Acceso (NO)',         // I
+  'Tipo Acceso Alt.',    // J (acceso_central | percutaneo | nada)
+  'Acceso Central Ubic.',// K (Y/I | Y/D | S/I | S/D)
+  'Cantidad',            // L
+  'Ubicación MSD',       // M
+  'Ubicación MSI',       // N
+  'Ubicación MII',       // O
+  'Ubicación MID',       // P
+  'Rótulo (SI/NO)',      // Q
+  'Rótulo Fecha',        // R (SI/NO)
+  'Rótulo Nombre',       // S (SI/NO)
+  'Rótulo Legajo',       // T (SI/NO)
+  'Rótulo Enfermero',    // U (SI/NO)
+  'Rótulo Turno',        // V (SI/NO)
+  'Rótulo ABB',          // W (SI/NO)
+  'Visibilidad (SI)',    // X
+  'Visibilidad (NO)',    // Y
+  'Fijación Tegaderm',   // Z
+  'Fijación Cinta',      // AA
+  'Tipo Cinta',          // AB
+  'Fijación Hipafix',    // AC
+  'Fijación Venda',      // AD
+  'Fijación Contención', // AE
+  'Adherencia',          // AF
+  'Llave 3 Vías',        // AG
+  'Tapón Multifunción',  // AH
+  'Infiltración',        // AI
+  'Eritematoso',         // AJ
+  'Retorno',             // AK
+  'Infusión Tipo'        // AL
 ];
 
 export function mapAccesoPerifericoToRow(data: AccesoPerifericoForm): (string | number | boolean)[] {
   const tiene = Boolean(data.tieneAcceso);
+  const esPercutaneo = !tiene && data.tipoAccesoAlternativo === 'percutaneo';
+  const evaluaRotulo = tiene || esPercutaneo;
+
   return [
-    data.fechaHora,                                   // A
-    data.sector,                                      // B
-    data.habitacion,                                  // C
-    data.cama,                                        // D
-    tiene ? 'SI' : '',                                // E
-    !tiene ? 'NO' : '',                               // F
-    tiene ? (data.cuantas ?? 1) : 0,                  // G
-    tiene && data.ubicacion === 'MSD' ? 'SI' : '',    // H
-    tiene && data.ubicacion === 'MSI' ? 'SI' : '',    // I
-    tiene && data.ubicacion === 'MII' ? 'SI' : '',    // J
-    tiene && data.ubicacion === 'MID' ? 'SI' : '',    // K
-    tiene ? (data.rotuloFecha || '') : '',            // L
-    tiene ? (data.rotuloABB ? 'SI' : 'NO') : '',      // M
-    tiene ? (data.rotuloNombre || '') : '',           // N
-    tiene ? (data.rotuloLegajo || '') : '',           // O
-    tiene ? (data.rotuloTurno || '') : '',            // P
-    tiene ? (data.visibilidad ? 'SI' : '') : '',      // Q
-    tiene ? (!data.visibilidad ? 'NO' : '') : '',     // R
-    tiene && data.fijacionTegaderm ? 'SI' : '',       // S
-    tiene && data.fijacionCinta ? 'SI' : '',          // T
-    tiene && data.fijacionHipafix ? 'SI' : '',        // U
-    tiene && data.fijacionVenda ? 'SI' : '',          // V
-    tiene && data.fijacionContencionMecanica ? 'SI' : '', // W
-    tiene ? (data.fijacionAdherencia || '') : '',     // X
-    tiene && data.lumenesLlave3Vias ? 'SI' : '',      // Y
-    tiene && data.lumenesTaponMultifuncion ? 'SI' : '',// Z
-    tiene && data.caracteristicasInfiltracion ? 'SI' : '', // AA
-    tiene && data.caracteristicasEritematoso ? 'SI' : '',   // AB
-    tiene && data.caracteristicasRetorno ? 'SI' : '',      // AC
-    tiene ? (data.infusionType || 'ninguna') : ''     // AD
+    data.fechaHora,                                                                 // A
+    data.sector,                                                                    // B
+    data.habitacion,                                                                // C
+    data.cama,                                                                      // D
+    data.historiaClinica || '',                                                     // E
+    data.cantidadEnfermeras ?? '',                                                  // F
+    data.cantidadAuxiliares ?? '',                                                  // G
+    tiene ? 'SI' : '',                                                              // H
+    !tiene ? 'NO' : '',                                                             // I
+    !tiene ? (data.tipoAccesoAlternativo || 'nada') : '',                          // J
+    !tiene && data.tipoAccesoAlternativo === 'acceso_central' ? (data.accesoCentralUbicacion || '') : '', // K
+    tiene ? (data.cuantas ?? 1) : 0,                                                // L
+    tiene && data.ubicacionMSD ? 'SI' : '',                                         // M
+    tiene && data.ubicacionMSI ? 'SI' : '',                                         // N
+    tiene && data.ubicacionMII ? 'SI' : '',                                         // O
+    tiene && data.ubicacionMID ? 'SI' : '',                                         // P
+    evaluaRotulo ? (data.tieneRotulo ? 'SI' : 'NO') : '',                           // Q
+    evaluaRotulo && data.tieneRotulo ? (data.rotuloTieneFecha ? 'SI' : 'NO') : '',   // R
+    evaluaRotulo && data.tieneRotulo ? (data.rotuloTieneNombre ? 'SI' : 'NO') : '',  // S
+    evaluaRotulo && data.tieneRotulo ? (data.rotuloTieneLegajo ? 'SI' : 'NO') : '',  // T
+    evaluaRotulo && data.tieneRotulo ? (data.rotuloTieneEnfermero ? 'SI' : 'NO') : '', // U
+    evaluaRotulo && data.tieneRotulo ? (data.rotuloTieneTurno ? 'SI' : 'NO') : '',   // V
+    evaluaRotulo && data.tieneRotulo ? (data.rotuloTieneABB ? 'SI' : 'NO') : '',     // W
+    tiene ? (data.visibilidad ? 'SI' : '') : '',                                    // X
+    tiene ? (!data.visibilidad ? 'NO' : '') : '',                                   // Y
+    tiene && data.fijacionTegaderm ? 'SI' : '',                                     // Z
+    tiene && data.fijacionCinta ? 'SI' : '',                                        // AA
+    tiene && data.fijacionCinta ? (data.fijacionCintaTipo || '') : '',              // AB
+    tiene && data.fijacionHipafix ? 'SI' : '',                                      // AC
+    tiene && data.fijacionVenda ? 'SI' : '',                                        // AD
+    tiene && data.fijacionContencionMecanica ? 'SI' : '',                           // AE
+    tiene ? (data.fijacionAdherencia || '') : '',                                   // AF
+    tiene && data.lumenesLlave3Vias ? 'SI' : '',                                    // AG
+    tiene && data.lumenesTaponMultifuncion ? 'SI' : '',                             // AH
+    tiene && data.caracteristicasInfiltracion ? 'SI' : '',                          // AI
+    tiene && data.caracteristicasEritematoso ? 'SI' : '',                           // AJ
+    tiene && data.caracteristicasRetorno ? 'SI' : '',                               // AK
+    tiene ? (data.infusionType || '') : ''                                          // AL
   ];
 }
 
-// Cabeceras exactas para la hoja UPP (Úlceras por Presión)
+// Cabeceras para la hoja UPP (Úlceras por Presión) (36 columnas)
 export const UPP_HEADERS = [
-  'Fecha/Hora',          // A
-  'Sector',              // B
-  'Habitación',          // C
-  'Cama',                // D
-  'UPP (SI)',            // E
-  'UPP (NO)',            // F
-  'Cantidad',            // G
-  'Ubicación Sacra',     // H
-  'Ubicación Talón',     // I
-  'Ubicación Glúteo',    // J
-  'Ubicación Posterior', // K
-  'Ubicación Otro',      // L
-  'Grado',               // M
-  'Tratamiento (SI/NO)', // N
-  'Tipo Tratamiento',    // O
-  'Detalle Tratamiento', // P
-  'Escala de Braden',    // Q
-  'Nutrición Oral',      // R
-  'Nutrición NPT',       // S
-  'Nutrición Enteral SN',// T
-  'Nutrición Enteral BG',// U
-  'Colchón Anti-escaras (SI)', // V
-  'Colchón Anti-escaras (NO)', // W
-  'Obs Colchón'          // X
+  'Fecha/Hora',                // A
+  'Sector',                    // B
+  'Habitación',                // C
+  'Cama',                      // D
+  'HC',                        // E
+  'Cant. Enfermeras',          // F
+  'Cant. Auxiliares',          // G
+  'Fecha Ingreso',             // H
+  'Área Cerrada (SI/NO)',      // I
+  'UPP (SI)',                  // J
+  'UPP (NO)',                  // K
+  'Cantidad',                  // L
+  'Ubicación Sacra',           // M
+  'Ubicación Talón',           // N
+  'Ubicación Glúteo',          // O
+  'Ubicación Posterior',       // P
+  'Ubicación Otro',            // Q
+  'Grado I',                   // R
+  'Grado II',                  // S
+  'Grado III',                 // T
+  'Grado IV',                  // U
+  'Tratamiento (SI/NO)',       // V
+  'Tipo Tratamiento',          // W
+  'Detalle Tratamiento',       // X
+  'Dispositivo Apoyo (SI/NO)', // Y
+  'Disp. Aro',                 // Z
+  'Disp. Guantes Agua',        // AA
+  'Disp. Otro',                // AB
+  'Escala de Braden',          // AC
+  'Nutrición Oral',            // AD
+  'Nutrición NPT',             // AE
+  'Nutrición Enteral SN',      // AF
+  'Nutrición Enteral BG',      // AG
+  'Colchón Anti-escaras (SI)', // AH
+  'Colchón Anti-escaras (NO)', // AI
+  'Obs Colchón'                // AJ
 ];
 
 export function mapUppToRow(data: UppForm): (string | number | boolean)[] {
   const tiene = Boolean(data.tieneUpp);
   return [
-    data.fechaHora,                                   // A
-    data.sector,                                      // B
-    data.habitacion,                                  // C
-    data.cama,                                        // D
-    tiene ? 'SI' : '',                                // E
-    !tiene ? 'NO' : '',                               // F
-    tiene ? (data.cuantas ?? 1) : 0,                  // G
-    tiene && data.ubicacionSacra ? 'SI' : '',         // H
-    tiene && data.ubicacionTalon ? 'SI' : '',         // I
-    tiene && data.ubicacionGluteo ? 'SI' : '',        // J
-    tiene && data.ubicacionPosterior ? 'SI' : '',      // K
-    tiene ? (data.ubicacionOtro || '') : '',          // L
-    tiene ? (data.gradoTratamiento || '') : '',       // M
-    tiene ? (data.tieneTratamiento ? 'SI' : 'NO') : '', // N
-    tiene ? (data.tipoTratamiento || '') : '',        // O
-    tiene ? (data.tipoTratamiento ? 'Activo' : '') : '', // P
-    tiene ? (data.escalaBraden ?? '') : '',           // Q
-    tiene && data.nutricion === 'oral' ? 'SI' : '',   // R
-    tiene && data.nutricion === 'NPT' ? 'SI' : '',    // S
-    tiene && data.nutricion === 'enteral SN' ? 'SI' : '', // T
-    tiene && data.nutricion === 'enteral BG' ? 'SI' : '', // U
-    tiene ? (data.colchonAntiEscaras ? 'SI' : '') : '', // V
-    tiene ? (!data.colchonAntiEscaras ? 'NO' : '') : '',// W
-    tiene ? (data.observacionesColchon || '') : ''    // X
+    data.fechaHora,                                                                 // A
+    data.sector,                                                                    // B
+    data.habitacion,                                                                // C
+    data.cama,                                                                      // D
+    data.historiaClinica || '',                                                     // E
+    data.cantidadEnfermeras ?? '',                                                  // F
+    data.cantidadAuxiliares ?? '',                                                  // G
+    data.fechaIngreso || '',                                                        // H
+    data.pasoAreaCerrada ? 'SI' : 'NO',                                             // I
+    tiene ? 'SI' : '',                                                              // J
+    !tiene ? 'NO' : '',                                                             // K
+    tiene ? (data.cuantas ?? 1) : 0,                                                // L
+    tiene && data.ubicacionSacra ? 'SI' : '',                                       // M
+    tiene && data.ubicacionTalon ? 'SI' : '',                                       // N
+    tiene && data.ubicacionGluteo ? 'SI' : '',                                      // O
+    tiene && data.ubicacionPosterior ? 'SI' : '',                                   // P
+    tiene ? (data.ubicacionOtro || '') : '',                                        // Q
+    tiene && data.gradoI ? 'SI' : '',                                               // R
+    tiene && data.gradoII ? 'SI' : '',                                              // S
+    tiene && data.gradoIII ? 'SI' : '',                                             // T
+    tiene && data.gradoIV ? 'SI' : '',                                              // U
+    tiene ? (data.tieneTratamiento ? 'SI' : 'NO') : '',                             // V
+    tiene ? (data.tipoTratamiento || '') : '',                                      // W
+    tiene ? (data.tipoTratamiento ? 'Activo' : '') : '',                            // X
+    tiene ? (data.tieneDispositivoApoyo ? 'SI' : 'NO') : '',                        // Y
+    tiene && data.tieneDispositivoApoyo && data.dispositivoAro ? 'SI' : '',         // Z
+    tiene && data.tieneDispositivoApoyo && data.dispositivoGuantesAgua ? 'SI' : '', // AA
+    tiene && data.tieneDispositivoApoyo && data.dispositivoOtro ? data.dispositivoOtro : '', // AB
+    tiene ? (data.escalaBraden ?? '') : '',                                         // AC
+    tiene && data.nutricion === 'oral' ? 'SI' : '',                                 // AD
+    tiene && data.nutricion === 'NPT' ? 'SI' : '',                                  // AE
+    tiene && data.nutricion === 'enteral SN' ? 'SI' : '',                           // AF
+    tiene && data.nutricion === 'enteral BG' ? 'SI' : '',                           // AG
+    tiene ? (data.colchonAntiEscaras ? 'SI' : '') : '',                             // AH
+    tiene ? (!data.colchonAntiEscaras ? 'NO' : '') : '',                            // AI
+    tiene ? (data.observacionesColchon || '') : ''                                  // AJ
   ];
 }

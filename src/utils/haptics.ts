@@ -57,6 +57,13 @@ class HapticFeedback {
       // Audio no permitido o silenciado
     }
   }
+
+  // Advertencia o deshacer
+  warning(): void {
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      navigator.vibrate([30, 40, 30]);
+    }
+  }
 }
 
 export const haptics = new HapticFeedback();

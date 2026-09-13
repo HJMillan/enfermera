@@ -128,6 +128,28 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
             const dataAcceso = isAcceso ? (item.data as AccesoPerifericoForm) : null;
             const dataUpp = !isAcceso ? (item.data as UppForm) : null;
 
+            const ubicacionesAcceso = dataAcceso
+              ? [
+                  dataAcceso.ubicacionMSD && 'MSD',
+                  dataAcceso.ubicacionMSI && 'MSI',
+                  dataAcceso.ubicacionMID && 'MID',
+                  dataAcceso.ubicacionMII && 'MII',
+                ]
+                  .filter(Boolean)
+                  .join(', ')
+              : '';
+
+            const gradosUpp = dataUpp
+              ? [
+                  dataUpp.gradoI && 'I',
+                  dataUpp.gradoII && 'II',
+                  dataUpp.gradoIII && 'III',
+                  dataUpp.gradoIV && 'IV',
+                ]
+                  .filter(Boolean)
+                  .join(', ')
+              : '';
+
             return (
               <div
                 key={item.id}
@@ -152,11 +174,20 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                         <span className="font-extrabold text-slate-900 text-sm">
                           Sec {item.data.sector} · Hab {item.data.habitacion} · Cama {item.data.cama}
                         </span>
+                        {item.data.historiaClinica && (
+                          <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
+                            HC: {item.data.historiaClinica}
+                          </span>
+                        )}
                         <span
                           className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0 ${
                             isAcceso
                               ? dataAcceso?.tieneAcceso
                                 ? 'bg-sky-100 text-sky-800'
+                                : dataAcceso?.tipoAccesoAlternativo === 'acceso_central'
+                                ? 'bg-indigo-100 text-indigo-800'
+                                : dataAcceso?.tipoAccesoAlternativo === 'percutaneo'
+                                ? 'bg-purple-100 text-purple-800'
                                 : 'bg-slate-100 text-slate-600'
                               : dataUpp?.tieneUpp
                               ? 'bg-rose-100 text-rose-800'
@@ -166,6 +197,10 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                           {isAcceso
                             ? dataAcceso?.tieneAcceso
                               ? 'Con Vía'
+                              : dataAcceso?.tipoAccesoAlternativo === 'acceso_central'
+                              ? 'Acceso Central'
+                              : dataAcceso?.tipoAccesoAlternativo === 'percutaneo'
+                              ? 'Percutáneo'
                               : 'Sin Vía'
                             : dataUpp?.tieneUpp
                             ? 'Con UPP'
@@ -175,8 +210,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
 
                       <div className="text-[11px] text-slate-600 flex items-center gap-2 mt-0.5">
                         <span>{item.data.fechaHora}</span>
-                        {isAcceso && dataAcceso?.tieneAcceso && (
-                          <span>· Ubic: {dataAcceso.ubicacion || 'S/D'}</span>
+                        {isAcceso && dataAcceso?.tieneAcceso && ubicacionesAcceso && (
+                          <span>· Ubic: {ubicacionesAcceso}</span>
                         )}
                         {!isAcceso && dataUpp?.tieneUpp && (
                           <span>· Braden: {dataUpp.escalaBraden} pts</span>
@@ -228,11 +263,19 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                         </div>
                         <div>
                           <span className="font-bold text-slate-600 block">Ubicación:</span>
-                          <span>{dataAcceso.ubicacion || '-'}</span>
+                          <span>{ubicacionesAcceso || '-'}</span>
                         </div>
                         <div>
-                          <span className="font-bold text-slate-600 block">Enfermero/a:</span>
-                          <span>{dataAcceso.rotuloNombre || '-'} ({dataAcceso.rotuloTurno || '-'})</span>
+                          <span className="font-bold text-slate-600 block">Rótulo:</span>
+                          <span>{dataAcceso.tieneRotulo ? 'SÍ' : 'NO'}</span>
+                        </div>
+                        <div>
+                          <span className="font-bold text-slate-600 block">Fijación Cinta:</span>
+                          <span>
+                            {dataAcceso.fijacionCinta
+                              ? `SÍ (${dataAcceso.fijacionCintaTipo || 'Estándar'})`
+                              : 'NO'}
+                          </span>
                         </div>
                         <div>
                           <span className="font-bold text-slate-600 block">Adherencia:</span>
@@ -245,19 +288,60 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                       </div>
                     )}
 
+                    {isAcceso && dataAcceso && !dataAcceso.tieneAcceso && (
+                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/60 text-slate-700">
+                        <div>
+                          <span className="font-bold text-slate-600 block">Acceso Alternativo:</span>
+                          <span>
+                            {dataAcceso.tipoAccesoAlternativo === 'acceso_central'
+                              ? `Acceso Central (${dataAcceso.accesoCentralUbicacion || 'S/D'})`
+                              : dataAcceso.tipoAccesoAlternativo === 'percutaneo'
+                              ? `Percutáneo (Rótulo: ${dataAcceso.tieneRotulo ? 'SÍ' : 'NO'})`
+                              : 'Ninguno / Nada'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
                     {!isAcceso && dataUpp && dataUpp.tieneUpp && (
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 border-t border-slate-200/60 text-slate-700">
+                        <div>
+                          <span className="font-bold text-slate-600 block">Fecha Ingreso:</span>
+                          <span>{dataUpp.fechaIngreso || '-'}</span>
+                        </div>
+                        <div>
+                          <span className="font-bold text-slate-600 block">Área Cerrada:</span>
+                          <span>{dataUpp.pasoAreaCerrada ? 'SÍ' : 'NO'}</span>
+                        </div>
                         <div>
                           <span className="font-bold text-slate-600 block">Cantidad:</span>
                           <span>{dataUpp.cuantas || 1}</span>
                         </div>
                         <div>
-                          <span className="font-bold text-slate-600 block">Grado:</span>
-                          <span>Grado {dataUpp.gradoTratamiento || '-'}</span>
+                          <span className="font-bold text-slate-600 block">Grados:</span>
+                          <span>{gradosUpp ? `Grado ${gradosUpp}` : '-'}</span>
                         </div>
                         <div>
                           <span className="font-bold text-slate-600 block">Braden:</span>
                           <span>{dataUpp.escalaBraden} puntos</span>
+                        </div>
+                        <div>
+                          <span className="font-bold text-slate-600 block">Tratamiento:</span>
+                          <span>{dataUpp.tipoTratamiento || '-'}</span>
+                        </div>
+                        <div>
+                          <span className="font-bold text-slate-600 block">Dispositivo Apoyo:</span>
+                          <span>
+                            {dataUpp.tieneDispositivoApoyo
+                              ? [
+                                  dataUpp.dispositivoAro && 'Aro',
+                                  dataUpp.dispositivoGuantesAgua && 'Guantes agua',
+                                  dataUpp.dispositivoOtro,
+                                ]
+                                  .filter(Boolean)
+                                  .join(', ') || 'SÍ'
+                              : 'NO'}
+                          </span>
                         </div>
                         <div>
                           <span className="font-bold text-slate-600 block">Nutrición:</span>

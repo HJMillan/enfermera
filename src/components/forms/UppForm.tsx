@@ -1,8 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, Minus, CheckCircle, HeartPulse, Sparkles, Award } from 'lucide-react';
+import {
+  Save,
+  Plus,
+  Minus,
+  CheckCircle,
+  HeartPulse,
+  Sparkles,
+  Award,
+  Calendar,
+  LifeBuoy,
+} from 'lucide-react';
 import type { BasePatientData, UppForm as UppFormType } from '../../types/form';
 import { ToggleYesNo } from '../common/ToggleYesNo';
 import { TouchChip } from '../common/TouchChip';
+import { StickyBottomBar } from '../common/StickyBottomBar';
+import { getCurrentDateISO } from '../../utils/dateUtils';
 
 interface UppFormProps {
   patient: BasePatientData;
@@ -16,6 +28,8 @@ type UbicacionKey =
   | 'ubicacionGluteo'
   | 'ubicacionPosterior';
 
+type GradoKey = 'gradoI' | 'gradoII' | 'gradoIII' | 'gradoIV';
+
 const COMMON_TREATMENTS = [
   'Curación Plana',
   'Platsul / Sulfadiazina',
@@ -23,19 +37,29 @@ const COMMON_TREATMENTS = [
   'Alginato de Calcio',
   'Cavilon / Film Protector',
   'Solución Fisiológica',
+  'Sacarosa (Azúcar)',
 ];
 
 const INITIAL_UPP_STATE = {
   tieneUpp: false,
+  fechaIngreso: getCurrentDateISO(),
+  pasoAreaCerrada: false,
   cuantas: 1,
   ubicacionSacra: false,
   ubicacionTalon: false,
   ubicacionGluteo: false,
   ubicacionPosterior: false,
   ubicacionOtro: '',
-  gradoTratamiento: 'I' as 'I' | 'II' | 'III' | 'IV' | '',
+  gradoI: false,
+  gradoII: false,
+  gradoIII: false,
+  gradoIV: false,
   tieneTratamiento: true,
   tipoTratamiento: '',
+  tieneDispositivoApoyo: false,
+  dispositivoAro: false,
+  dispositivoGuantesAgua: false,
+  dispositivoOtro: '',
   escalaBraden: 15,
   nutricion: 'oral' as 'oral' | 'NPT' | 'enteral SN' | 'enteral BG' | '',
   colchonAntiEscaras: true,
@@ -44,6 +68,7 @@ const INITIAL_UPP_STATE = {
 
 export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShiftClose }) => {
   const [form, setForm] = useState(INITIAL_UPP_STATE);
+  const [hasOtroDispositivo, setHasOtroDispositivo] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Atajos de teclado en Chromebook
@@ -74,36 +99,44 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
       const fullData: UppFormType = {
         ...patient,
         ...form,
+        dispositivoOtro: hasOtroDispositivo ? form.dispositivoOtro : '',
       };
       await onSubmit(fullData);
       setForm(INITIAL_UPP_STATE);
+      setHasOtroDispositivo(false);
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // Rangos actualizados de Braden:
+  // <= 12: Riesgo Alto (rojo)
+  // 13 - 14: Riesgo Moderado (ámbar)
+  // > 14: Riesgo Bajo (verde)
   const getBradenRiskBadge = (score: number) => {
     if (score <= 12) {
-      return { label: 'Alto Riesgo', color: 'bg-rose-100 text-rose-800 border-rose-300' };
+      return { label: 'Riesgo Alto', color: 'bg-rose-100 text-rose-800 border-rose-300' };
     }
     if (score <= 14) {
       return { label: 'Riesgo Moderado', color: 'bg-amber-100 text-amber-800 border-amber-300' };
     }
-    if (score <= 18) {
-      return { label: 'Bajo Riesgo', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' };
-    }
-    return { label: 'Sin Riesgo', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' };
+    return { label: 'Riesgo Bajo', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' };
   };
 
   const bradenRisk = getBradenRiskBadge(form.escalaBraden);
 
   return (
-    <form onSubmit={handleSubmit} className="px-3 pb-24 md:px-4 space-y-3.5 max-w-2xl mx-auto">
+    <form
+      id="upp-form"
+      onSubmit={handleSubmit}
+      className="px-3 pb-32 md:px-4 space-y-3.5 max-w-2xl mx-auto"
+    >
       {/* Pregunta Clave de Mínimos Clicks */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
         <div className="flex items-center justify-between mb-1">
           <span className="text-[11px] font-bold uppercase tracking-wider text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-100">
             Cama {patient.cama} · Habitación {patient.habitacion}
+            {patient.historiaClinica && ` · HC: ${patient.historiaClinica}`}
           </span>
           <span className="text-[11px] text-slate-500 font-mono hidden sm:inline">
             Atajos: [N] No · [S] Sí
@@ -124,11 +157,13 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full min-h-[56px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-base md:text-lg flex items-center justify-center gap-2 shadow-lg shadow-emerald-200 touch-active cursor-pointer transition-all"
+            className="w-full min-h-[56px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-base md:text-lg hidden md:flex items-center justify-center gap-2 shadow-lg shadow-emerald-200 touch-active cursor-pointer transition-all"
           >
             <CheckCircle className="w-5 h-5" />
             <span>{isSubmitting ? 'Guardando...' : 'Guardar Paciente (Sin UPP / Piel Íntegra)'}</span>
-            <span className="text-xs bg-emerald-700/60 px-2 py-0.5 rounded font-mono hidden sm:inline">[Enter]</span>
+            <span className="text-xs bg-emerald-700/60 px-2 py-0.5 rounded font-mono hidden sm:inline">
+              [Enter]
+            </span>
           </button>
 
           <p className="text-center text-xs text-slate-600">
@@ -151,22 +186,78 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
         </div>
       )}
 
-      {/* CASO 2: SÍ TIENE UPP -> Acordeón con preguntas desplegadas */}
+      {/* CASO 2: SÍ TIENE UPP -> Formulario completo desplegado */}
       {form.tieneUpp && (
         <div className="space-y-3.5 animate-fade-in">
-          {/* 1. Cantidad y Ubicación Anatómica */}
+          {/* 1. Contexto de Ingreso y Área Cerrada */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+            <span className="block font-bold text-slate-800 text-sm flex items-center gap-1.5 border-b border-slate-100 pb-2">
+              <Calendar className="w-4 h-4 text-rose-700" />
+              Datos de Ingreso del Paciente
+            </span>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] font-bold text-slate-600 uppercase block mb-1">
+                  Fecha de Ingreso
+                </label>
+                <input
+                  type="date"
+                  value={form.fechaIngreso}
+                  onChange={(e) => setForm((p) => ({ ...p, fechaIngreso: e.target.value }))}
+                  className="w-full min-h-[44px] px-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-slate-50 focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-600 uppercase block mb-1">
+                  ¿Pasó por Área Cerrada? (UTI / UCO)
+                </label>
+                <div className="grid grid-cols-2 gap-2 min-h-[44px]">
+                  <button
+                    type="button"
+                    onClick={() => setForm((p) => ({ ...p, pasoAreaCerrada: true }))}
+                    className={`rounded-xl font-bold text-xs border touch-active cursor-pointer ${
+                      form.pasoAreaCerrada
+                        ? 'bg-rose-700 text-white border-rose-700 shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    SÍ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm((p) => ({ ...p, pasoAreaCerrada: false }))}
+                    className={`rounded-xl font-bold text-xs border touch-active cursor-pointer ${
+                      !form.pasoAreaCerrada
+                        ? 'bg-slate-700 text-white border-slate-700 shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    NO
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Cantidad y Ubicación Anatómica */}
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
             <div className="flex items-center justify-between">
               <span className="font-bold text-slate-800 text-sm">Cantidad de Lesiones</span>
               <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-1">
                 <button
                   type="button"
-                  onClick={() => setForm((p) => ({ ...p, cuantas: Math.max(1, (p.cuantas || 1) - 1) }))}
+                  onClick={() =>
+                    setForm((p) => ({ ...p, cuantas: Math.max(1, (p.cuantas || 1) - 1) }))
+                  }
                   className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-700 flex items-center justify-center touch-active"
                 >
                   <Minus className="w-3.5 h-3.5" />
                 </button>
-                <span className="font-bold text-base w-6 text-center text-rose-900">{form.cuantas}</span>
+                <span className="font-bold text-base w-6 text-center text-rose-900">
+                  {form.cuantas}
+                </span>
                 <button
                   type="button"
                   onClick={() => setForm((p) => ({ ...p, cuantas: (p.cuantas || 1) + 1 }))}
@@ -178,7 +269,9 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
             </div>
 
             <div>
-              <span className="block font-bold text-slate-800 text-sm mb-1.5">Ubicación de la Lesión</span>
+              <span className="block font-bold text-slate-800 text-sm mb-1.5">
+                Ubicación de la Lesión
+              </span>
               <div className="grid grid-cols-2 gap-2">
                 {[
                   { key: 'ubicacionSacra' as const, label: 'Sacra' },
@@ -200,7 +293,9 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
 
               {/* Otra ubicación */}
               <div className="mt-2.5">
-                <label className="text-[11px] font-bold text-slate-600 uppercase block mb-1">Otra ubicación (opcional)</label>
+                <label className="text-[11px] font-bold text-slate-600 uppercase block mb-1">
+                  Otra ubicación (opcional)
+                </label>
                 <input
                   type="text"
                   value={form.ubicacionOtro}
@@ -212,19 +307,31 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
             </div>
           </div>
 
-          {/* 2. Grado de la Lesión y Tratamiento con Chips Rápidos */}
+          {/* 3. Grados de la UPP (Multi-selección) y Tratamiento */}
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
             <div>
-              <span className="block font-bold text-slate-800 text-sm mb-1.5">Grado de la UPP</span>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="font-bold text-slate-800 text-sm">Grado de la UPP</span>
+                <span className="text-[11px] text-rose-700 font-semibold">
+                  (Selección múltiple permitida)
+                </span>
+              </div>
               <div className="grid grid-cols-4 gap-1.5">
-                {(['I', 'II', 'III', 'IV'] as const).map((g) => (
+                {[
+                  { key: 'gradoI' as const, label: 'I' },
+                  { key: 'gradoII' as const, label: 'II' },
+                  { key: 'gradoIII' as const, label: 'III' },
+                  { key: 'gradoIV' as const, label: 'IV' },
+                ].map((g) => (
                   <TouchChip
-                    key={g}
-                    label={g}
+                    key={g.key}
+                    label={g.label}
                     subtitle="Grado"
                     color="danger"
-                    selected={form.gradoTratamiento === g}
-                    onClick={() => setForm((p) => ({ ...p, gradoTratamiento: g }))}
+                    selected={Boolean(form[g.key as GradoKey])}
+                    onClick={() =>
+                      setForm((p) => ({ ...p, [g.key]: !p[g.key as GradoKey] }))
+                    }
                   />
                 ))}
               </div>
@@ -237,12 +344,12 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
             />
 
             {form.tieneTratamiento && (
-              <div className="space-y-2">
+              <div className="space-y-2 pt-1 border-t border-slate-100">
                 <label className="text-[11px] font-bold text-slate-600 uppercase block mb-1">
                   Tipo de Curación / Tratamiento
                 </label>
 
-                {/* Chips de insumos rápidos (Zero-Typing) */}
+                {/* Chips de insumos rápidos incluyendo Sacarosa (Azúcar) */}
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {COMMON_TREATMENTS.map((treat) => (
                     <button
@@ -272,24 +379,96 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
             )}
           </div>
 
-          {/* 3. Escala de Braden (3 al 23) */}
+          {/* 4. Dispositivos de Apoyo (Nueva sección / Card) */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+            <div className="flex items-center gap-1.5 border-b border-slate-100 pb-2">
+              <LifeBuoy className="w-4 h-4 text-sky-700" />
+              <span className="font-bold text-slate-900 text-sm">Dispositivos de Apoyo</span>
+            </div>
+
+            <ToggleYesNo
+              label="¿Cuenta con Dispositivo de Apoyo?"
+              description="Indica si el paciente utiliza elementos de alivio de presión"
+              value={Boolean(form.tieneDispositivoApoyo)}
+              onChange={(val) => setForm((p) => ({ ...p, tieneDispositivoApoyo: val }))}
+            />
+
+            {form.tieneDispositivoApoyo && (
+              <div className="space-y-3 pt-2 border-t border-slate-100 animate-fade-in">
+                <span className="text-[11px] font-bold text-slate-600 uppercase block">
+                  Dispositivos en uso:
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <TouchChip
+                    label="Aro"
+                    selected={Boolean(form.dispositivoAro)}
+                    onClick={() => setForm((p) => ({ ...p, dispositivoAro: !p.dispositivoAro }))}
+                  />
+
+                  <TouchChip
+                    label="Guantes con agua"
+                    subtitle="Para talones"
+                    selected={Boolean(form.dispositivoGuantesAgua)}
+                    onClick={() =>
+                      setForm((p) => ({
+                        ...p,
+                        dispositivoGuantesAgua: !p.dispositivoGuantesAgua,
+                      }))
+                    }
+                  />
+
+                  <TouchChip
+                    label="Otro"
+                    subtitle="Especificar..."
+                    selected={hasOtroDispositivo}
+                    onClick={() => setHasOtroDispositivo((prev) => !prev)}
+                  />
+                </div>
+
+                {/* Input libre cuando "Otro" está seleccionado */}
+                {hasOtroDispositivo && (
+                  <div className="pt-1 animate-fade-in">
+                    <label className="text-[11px] font-bold text-slate-600 uppercase block mb-1">
+                      Descripción del otro dispositivo de apoyo:
+                    </label>
+                    <input
+                      type="text"
+                      value={form.dispositivoOtro}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, dispositivoOtro: e.target.value }))
+                      }
+                      placeholder="Ej: Taloneras de vellón, almohada cuña, etc..."
+                      className="w-full min-h-[44px] px-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-slate-50 focus:bg-white"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* 5. Escala de Braden (<=12 Alto, 13-14 Moderado, >14 Bajo) */}
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
             <div className="flex items-center justify-between">
               <div>
                 <span className="font-bold text-slate-800 text-sm block">Escala de Braden</span>
-                <span className="text-xs text-slate-600">Rango de 3 a 23 puntos</span>
+                <span className="text-xs text-slate-600">Riesgo de lesión según puntuación</span>
               </div>
-              <span className={`text-xs font-extrabold px-2.5 py-1 rounded-full border ${bradenRisk.color}`}>
+              <span
+                className={`text-xs font-extrabold px-2.5 py-1 rounded-full border ${bradenRisk.color}`}
+              >
                 {form.escalaBraden} pts · {bradenRisk.label}
               </span>
             </div>
 
-            {/* Stepper y Presets rápidos */}
+            {/* Stepper numérico */}
             <div className="flex items-center justify-center gap-4 py-1">
               <button
                 type="button"
-                onClick={() => setForm((p) => ({ ...p, escalaBraden: Math.max(3, p.escalaBraden - 1) }))}
-                className="w-12 h-12 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-lg touch-active"
+                onClick={() =>
+                  setForm((p) => ({ ...p, escalaBraden: Math.max(3, p.escalaBraden - 1) }))
+                }
+                className="w-12 h-12 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-lg touch-active cursor-pointer"
               >
                 <Minus className="w-5 h-5" />
               </button>
@@ -313,28 +492,31 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
 
               <button
                 type="button"
-                onClick={() => setForm((p) => ({ ...p, escalaBraden: Math.min(23, p.escalaBraden + 1) }))}
-                className="w-12 h-12 rounded-2xl bg-sky-600 hover:bg-sky-700 text-white flex items-center justify-center font-bold text-lg touch-active"
+                onClick={() =>
+                  setForm((p) => ({ ...p, escalaBraden: Math.min(23, p.escalaBraden + 1) }))
+                }
+                className="w-12 h-12 rounded-2xl bg-sky-600 hover:bg-sky-700 text-white flex items-center justify-center font-bold text-lg touch-active cursor-pointer"
               >
                 <Plus className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Accesos rápidos de puntajes estándar */}
-            <div className="grid grid-cols-4 gap-1.5 pt-1">
+            {/* Presets rápidos ajustados a los 3 rangos exactos */}
+            <div className="grid grid-cols-3 gap-2 pt-1">
               {[
-                { score: 10, label: '10 (Alto)' },
-                { score: 14, label: '14 (Mod)' },
-                { score: 17, label: '17 (Bajo)' },
-                { score: 23, label: '23 (Sin)' },
+                { score: 10, label: '≤12 (Riesgo Alto)' },
+                { score: 13, label: '13-14 (Riesgo Moderado)' },
+                { score: 15, label: '>14 (Riesgo Bajo)' },
               ].map((preset) => (
                 <button
                   key={preset.score}
                   type="button"
                   onClick={() => setForm((p) => ({ ...p, escalaBraden: preset.score }))}
-                  className={`py-1.5 px-1 rounded-xl text-xs font-bold border transition-all touch-active ${
-                    form.escalaBraden === preset.score
-                      ? 'bg-slate-800 text-white border-slate-800'
+                  className={`py-2 px-1 rounded-xl text-xs font-bold border transition-all touch-active cursor-pointer ${
+                    (preset.score === 10 && form.escalaBraden <= 12) ||
+                    (preset.score === 13 && form.escalaBraden >= 13 && form.escalaBraden <= 14) ||
+                    (preset.score === 15 && form.escalaBraden > 14)
+                      ? 'bg-slate-800 text-white border-slate-800 shadow-xs'
                       : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
                   }`}
                 >
@@ -344,7 +526,7 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
             </div>
           </div>
 
-          {/* 4. Nutrición */}
+          {/* 6. Nutrición */}
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-2">
             <span className="block font-bold text-slate-800 text-sm flex items-center gap-1.5">
               <HeartPulse className="w-4 h-4 text-rose-700" />
@@ -367,7 +549,7 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
             </div>
           </div>
 
-          {/* 5. Colchón Anti-escaras */}
+          {/* 7. Colchón Anti-escaras */}
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
             <ToggleYesNo
               label="¿Cuenta con Colchón Anti-escaras?"
@@ -390,7 +572,7 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
           </div>
 
           {/* Botón Principal Guardar */}
-          <div className="pt-2">
+          <div className="pt-2 hidden md:block">
             <button
               type="submit"
               disabled={isSubmitting}
@@ -398,11 +580,24 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
             >
               <Save className="w-5 h-5" />
               <span>{isSubmitting ? 'Guardando...' : 'Guardar Registro de UPP'}</span>
-              <span className="text-xs bg-rose-800/60 px-2 py-0.5 rounded font-mono hidden sm:inline">[Enter]</span>
+              <span className="text-xs bg-rose-800/60 px-2 py-0.5 rounded font-mono hidden sm:inline">
+                [Enter]
+              </span>
             </button>
           </div>
         </div>
       )}
+
+      {/* Barra de Guardado Flotante en la Zona del Pulgar */}
+      <StickyBottomBar
+        formId="upp-form"
+        isSubmitting={isSubmitting}
+        cama={patient.cama}
+        habitacion={patient.habitacion}
+        sector={patient.sector}
+        hasCondition={form.tieneUpp}
+        roundType="UPP"
+      />
     </form>
   );
 };

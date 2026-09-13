@@ -8,9 +8,38 @@ const STORAGE_KEYS = {
   LAST_BED: 'pe_last_bed',
   RECORDS_HISTORY: 'pe_records_history_v1',
   NOTIFICATION_EMAILS: 'pe_notification_emails',
+  LAST_HC: 'pe_last_hc',
+  STAFF_BY_SECTOR: 'pe_staff_by_sector_v1',
 };
 
 export const DEFAULT_NOTIFICATION_EMAILS = ['jesusmillan86@gmail.com', 'pamelaestua91@gmail.com'];
+
+export interface SectorStaff {
+  enfermeras: number;
+  auxiliares: number;
+}
+
+export function getStaffBySector(sector: SectorType): SectorStaff {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.STAFF_BY_SECTOR);
+    if (!raw) return { enfermeras: 0, auxiliares: 0 };
+    const parsed = JSON.parse(raw);
+    return parsed[sector] || { enfermeras: 0, auxiliares: 0 };
+  } catch {
+    return { enfermeras: 0, auxiliares: 0 };
+  }
+}
+
+export function saveStaffBySector(sector: SectorType, staff: SectorStaff): void {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.STAFF_BY_SECTOR);
+    const parsed = raw ? JSON.parse(raw) : {};
+    parsed[sector] = staff;
+    localStorage.setItem(STORAGE_KEYS.STAFF_BY_SECTOR, JSON.stringify(parsed));
+  } catch (err) {
+    console.error('Error al guardar staff por sector:', err);
+  }
+}
 
 export function getNotificationEmails(): string[] {
   const stored = localStorage.getItem(STORAGE_KEYS.NOTIFICATION_EMAILS);
@@ -41,13 +70,15 @@ export interface PatientContextMemory {
   sector: SectorType;
   habitacion: string;
   cama: string;
+  historiaClinica: string;
 }
 
 export function getPatientContextMemory(): PatientContextMemory {
   return {
-    sector: (localStorage.getItem(STORAGE_KEYS.LAST_SECTOR) as SectorType) || 'A',
-    habitacion: localStorage.getItem(STORAGE_KEYS.LAST_ROOM) || '101',
+    sector: (localStorage.getItem(STORAGE_KEYS.LAST_SECTOR) as SectorType) || 'PB',
+    habitacion: localStorage.getItem(STORAGE_KEYS.LAST_ROOM) || '1',
     cama: localStorage.getItem(STORAGE_KEYS.LAST_BED) || '1',
+    historiaClinica: localStorage.getItem(STORAGE_KEYS.LAST_HC) || '',
   };
 }
 
@@ -55,6 +86,7 @@ export function savePatientContextMemory(data: PatientContextMemory): void {
   localStorage.setItem(STORAGE_KEYS.LAST_SECTOR, data.sector);
   localStorage.setItem(STORAGE_KEYS.LAST_ROOM, data.habitacion);
   localStorage.setItem(STORAGE_KEYS.LAST_BED, data.cama);
+  localStorage.setItem(STORAGE_KEYS.LAST_HC, data.historiaClinica || '');
 }
 
 // Records History & Queue
@@ -73,6 +105,12 @@ export function saveRecordLocally(record: StoredRecord): void {
   const updated = [record, ...current.filter((r) => r.id !== record.id)];
   // Conservar hasta 200 registros en local
   localStorage.setItem(STORAGE_KEYS.RECORDS_HISTORY, JSON.stringify(updated.slice(0, 200)));
+}
+
+export function deleteRecordLocally(id: string): void {
+  const current = getStoredRecords();
+  const updated = current.filter((r) => r.id !== id);
+  localStorage.setItem(STORAGE_KEYS.RECORDS_HISTORY, JSON.stringify(updated));
 }
 
 export function updateRecordStatus(id: string, status: StoredRecord['syncStatus'], errorMsg?: string): void {

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Settings, Link2, Check, RefreshCw, HelpCircle, FileSpreadsheet, Trash2, Mail } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Settings, Link2, Check, RefreshCw, HelpCircle, FileSpreadsheet, Trash2, Mail, Smartphone, Download } from 'lucide-react';
 import {
   getStoredWebhookUrl,
   setStoredWebhookUrl,
@@ -7,6 +7,11 @@ import {
   getNotificationEmails,
   setNotificationEmails,
 } from '../../services/storageService';
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -19,6 +24,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
   const [emailsText, setEmailsText] = useState(() => getNotificationEmails().join(', '));
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [showInstructions, setShowInstructions] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isInstalled, setIsInstalled] = useState(() => 
+    typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches
+  );
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e as BeforeInstallPromptEvent);
+    };
+
+    const mediaQuery = window.matchMedia('(display-mode: standalone)');
+    const handleDisplayModeChange = (e: MediaQueryListEvent) => {
+      setIsInstalled(e.matches);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    mediaQuery.addEventListener('change', handleDisplayModeChange);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      mediaQuery.removeEventListener('change', handleDisplayModeChange);
+    };
+  }, []);
 
   if (!isOpen) return null;
 
@@ -57,6 +86,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
     if (confirm('¿Deseas vaciar el historial local de este turno?')) {
       clearStoredRecords();
       if (onHistoryCleared) onHistoryCleared();
+    }
+  };
+
+  const handleInstallPWA = async () => {
+    if (installPrompt) {
+      await installPrompt.prompt();
+      const choice = await installPrompt.userChoice;
+      if (choice.outcome === 'accepted') {
+        setIsInstalled(true);
+        setInstallPrompt(null);
+      }
+    } else {
+      alert(
+        'Para instalar en iPhone/iPad: toca el botón Compartir y selecciona "Agregar a pantalla de inicio".\nEn Chrome de Android o PC: haz clic en el menú (⋮) y selecciona "Instalar aplicación".'
+      );
     }
   };
 
@@ -162,6 +206,36 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                 <li>Selecciona tipo <b>Aplicación web</b> con acceso <b>Cualquier usuario</b>.</li>
                 <li>Copia la URL de la aplicación web y pégala aquí arriba.</li>
               </ol>
+            )}
+          </div>
+
+          {/* Instalación como App Nativa (PWA / Offline) */}
+          <div className="border border-slate-200 bg-slate-50/80 rounded-2xl p-3.5 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
+                <Smartphone className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <span className="font-bold text-slate-800 text-xs block">
+                  {isInstalled ? 'App Instalada en este equipo' : 'Instalar en Pantalla de Inicio'}
+                </span>
+                <span className="text-[11px] text-slate-600 truncate block">
+                  {isInstalled
+                    ? 'Funcionando en modo independiente a pantalla completa'
+                    : 'Abre la planilla como app nativa y úsala sin conexión'}
+                </span>
+              </div>
+            </div>
+
+            {!isInstalled && (
+              <button
+                type="button"
+                onClick={handleInstallPWA}
+                className="px-3 py-1.5 rounded-xl bg-sky-700 hover:bg-sky-800 text-white font-bold text-xs flex items-center gap-1 shadow-xs touch-active cursor-pointer shrink-0"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Instalar</span>
+              </button>
             )}
           </div>
 

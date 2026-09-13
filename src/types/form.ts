@@ -1,49 +1,100 @@
-export type SectorType = 'A' | 'B' | 'C' | 'D' | 'E' | string;
+export type SectorType =
+  | 'PB'
+  | '1° Piso'
+  | 'Maternidad'
+  | 'A'
+  | 'B'
+  | 'C'
+  | 'D'
+  | 'E'
+  | string;
 
 export interface BasePatientData {
   fechaHora: string;
   sector: SectorType;
   habitacion: string;
   cama: string;
+  historiaClinica: string;
+  cantidadEnfermeras?: number;
+  cantidadAuxiliares?: number;
 }
 
-// 1. Acceso Periférico (Columnas A - AD)
+// 1. Acceso Periférico
 export interface AccesoPerifericoForm extends BasePatientData {
   tieneAcceso: boolean;
   cuantas?: number;
-  ubicacion?: 'MSD' | 'MSI' | 'MII' | 'MID' | '';
-  rotuloFecha?: string;
-  rotuloABB?: boolean;
-  rotuloNombre?: string;
-  rotuloLegajo?: string;
-  rotuloTurno?: 'Mañana' | 'Tarde' | 'Noche' | '';
+
+  // Ubicación anatómica (multi-selección)
+  ubicacionMSD?: boolean;
+  ubicacionMSI?: boolean;
+  ubicacionMII?: boolean;
+  ubicacionMID?: boolean;
+
+  // Rótulo de colocación (SI/NO condicional)
+  tieneRotulo?: boolean;
+  rotuloTieneFecha?: boolean;
+  rotuloTieneNombre?: boolean;
+  rotuloTieneLegajo?: boolean;
+  rotuloTieneEnfermero?: boolean;
+  rotuloTieneTurno?: boolean;
+  rotuloTieneABB?: boolean;
+
+  // Inspección y fijación
   visibilidad?: boolean;
   fijacionTegaderm?: boolean;
   fijacionCinta?: boolean;
+  fijacionCintaTipo?: 'hipoalergénica' | 'tela' | 'seda' | 'coban' | 'papel' | '';
   fijacionHipafix?: boolean;
   fijacionVenda?: boolean;
   fijacionContencionMecanica?: boolean;
   fijacionAdherencia?: 'total' | 'parcial' | 'nula' | '';
+
+  // Lúmenes y clínica
   lumenesLlave3Vias?: boolean;
   lumenesTaponMultifuncion?: boolean;
   caracteristicasInfiltracion?: boolean;
   caracteristicasEritematoso?: boolean;
   caracteristicasRetorno?: boolean;
-  infusionType?: 'continua' | 'intermitente' | 'ninguna' | '';
+
+  // Infusión (solo continua o intermitente)
+  infusionType?: 'continua' | 'intermitente' | '';
+
+  // Opciones cuando NO tiene acceso periférico
+  tipoAccesoAlternativo?: 'acceso_central' | 'percutaneo' | 'nada' | '';
+  accesoCentralUbicacion?: 'Y/I' | 'Y/D' | 'S/I' | 'S/D' | '';
 }
 
-// 2. Úlceras por Presión (UPP) (Columnas A - X)
+// 2. Úlceras por Presión (UPP)
 export interface UppForm extends BasePatientData {
   tieneUpp: boolean;
+  fechaIngreso?: string;
+  pasoAreaCerrada?: boolean;
   cuantas?: number;
+
+  // Ubicación
   ubicacionSacra?: boolean;
   ubicacionTalon?: boolean;
   ubicacionGluteo?: boolean;
   ubicacionPosterior?: boolean;
   ubicacionOtro?: string;
-  gradoTratamiento?: 'I' | 'II' | 'III' | 'IV' | '';
+
+  // Grados de la UPP (multi-selección)
+  gradoI?: boolean;
+  gradoII?: boolean;
+  gradoIII?: boolean;
+  gradoIV?: boolean;
+
+  // Tratamiento
   tieneTratamiento?: boolean;
   tipoTratamiento?: string;
+
+  // Dispositivos de Apoyo
+  tieneDispositivoApoyo?: boolean;
+  dispositivoAro?: boolean;
+  dispositivoGuantesAgua?: boolean;
+  dispositivoOtro?: string;
+
+  // Escala y Cuidados
   escalaBraden?: number;
   nutricion?: 'oral' | 'NPT' | 'enteral SN' | 'enteral BG' | '';
   colchonAntiEscaras?: boolean;
