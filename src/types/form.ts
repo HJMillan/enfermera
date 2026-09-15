@@ -62,6 +62,9 @@ export interface AccesoPerifericoForm extends BasePatientData {
   // Opciones cuando NO tiene acceso periférico
   tipoAccesoAlternativo?: 'acceso_central' | 'percutaneo' | 'nada' | '';
   accesoCentralUbicacion?: 'Y/I' | 'Y/D' | 'S/I' | 'S/D' | '';
+
+  // Observaciones libres
+  observaciones?: string;
 }
 
 // 2. Úlceras por Presión (UPP)
@@ -69,6 +72,7 @@ export interface UppForm extends BasePatientData {
   tieneUpp: boolean;
   fechaIngreso?: string;
   pasoAreaCerrada?: boolean;
+  areaCerradaCual?: string;
   cuantas?: number;
 
   // Ubicación
@@ -85,8 +89,10 @@ export interface UppForm extends BasePatientData {
   gradoIV?: boolean;
 
   // Tratamiento
+  // Tratamiento (multi-selección)
   tieneTratamiento?: boolean;
   tipoTratamiento?: string;
+  tratamientos?: string[];
 
   // Dispositivos de Apoyo
   tieneDispositivoApoyo?: boolean;
@@ -96,7 +102,11 @@ export interface UppForm extends BasePatientData {
 
   // Escala y Cuidados
   escalaBraden?: number;
-  nutricion?: 'oral' | 'NPT' | 'enteral SN' | 'enteral BG' | '';
+  nutricion?: string;
+  nutricionOral?: boolean;
+  nutricionNpt?: boolean;
+  nutricionEnteralSn?: boolean;
+  nutricionEnteralBg?: boolean;
   colchonAntiEscaras?: boolean;
   observacionesColchon?: string;
 }

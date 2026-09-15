@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Settings, Wifi, ShieldCheck, HeartPulse, Award, Syringe, Bandage, Keyboard } from 'lucide-react';
+import { Settings, Wifi, ShieldCheck, HeartPulse, Award, Syringe, Bandage, Keyboard, ClipboardList } from 'lucide-react';
 import type { BasePatientData, AccesoPerifericoForm as AccesoFormType, UppForm as UppFormType, StoredRecord } from './types/form';
 import { formatCurrentDateTime } from './utils/dateUtils';
 import { haptics } from './utils/haptics';
@@ -12,6 +12,7 @@ import {
   deleteRecordLocally,
 } from './services/storageService';
 import { MAX_BEDS } from './config/sectorConfig';
+
 import { submitPatientRecord } from './services/webhookService';
 import { PatientHeader } from './components/common/PatientHeader';
 import { ModuleTabs, type ActiveTab } from './components/navigation/ModuleTabs';
@@ -191,13 +192,16 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col antialiased selection:bg-sky-200">
       {/* Barra de Navegación Principal Superior */}
-      <header className="bg-white border-b border-slate-200 px-3 py-2.5 md:px-6 flex items-center justify-between shadow-xs sticky top-0 z-30">
+      <header className="bg-white border-b border-slate-200 px-3 py-2.5 md:px-6 flex items-center justify-between shadow-xs sticky top-0 z-30" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 0.625rem)' }}>
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-600 to-cyan-500 text-white flex items-center justify-center shadow-xs">
+          <div className="w-8 h-8 rounded-xl bg-linear-to-tr from-sky-600 to-cyan-500 text-white flex items-center justify-center shadow-xs">
             <HeartPulse className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="font-extrabold text-slate-900 text-base leading-tight">Planilla Enfermera</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="font-extrabold text-slate-900 text-base leading-tight">Planilla Enfermera</h1>
+              <span className="text-[10px] font-bold bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded-md leading-none">v1.0.0</span>
+            </div>
             <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
               <span className="font-medium text-slate-700">Turno 8:00 a 16:00 hs</span>
               <span>·</span>
@@ -219,7 +223,7 @@ export default function App() {
           <button
             type="button"
             onClick={() => setIsShiftModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-xs shadow-xs hover:from-amber-600 hover:to-orange-600 touch-active cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-linear-to-r from-amber-500 to-orange-500 text-white font-bold text-xs shadow-xs hover:from-amber-600 hover:to-orange-600 touch-active cursor-pointer"
             title="Ver resumen y cerrar turno a las 16:00 hs"
           >
             <Award className="w-4 h-4" />
@@ -292,6 +296,27 @@ export default function App() {
                 </div>
                 <span className="font-black text-base text-rose-800">{uppRecords.length}</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('HISTORY')}
+                className={`w-full p-3 rounded-2xl border text-left flex items-center justify-between transition-all touch-active cursor-pointer ${
+                  activeTab === 'HISTORY'
+                    ? 'bg-slate-100 border-slate-400 text-slate-950 ring-2 ring-slate-300'
+                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-slate-600 text-white flex items-center justify-center">
+                    <ClipboardList className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="font-extrabold text-sm block leading-tight">Historial</span>
+                    <span className="text-[11px] text-slate-600">Registros del turno</span>
+                  </div>
+                </div>
+                <span className="font-black text-base text-slate-700">{records.length}</span>
+              </button>
             </div>
 
             {/* Atajos de Chromebook */}
@@ -312,7 +337,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setIsShiftModalOpen(true)}
-              className="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm touch-active cursor-pointer"
+              className="w-full py-3 rounded-2xl bg-linear-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm touch-active cursor-pointer"
             >
               <Award className="w-4 h-4" />
               <span>Resumen y Cierre de Turno (16:00 hs)</span>

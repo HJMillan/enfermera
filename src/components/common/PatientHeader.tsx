@@ -16,7 +16,6 @@ import type { BasePatientData, SectorType, FormType, StoredRecord } from '../../
 import {
   SECTORS,
   COMMON_BEDS,
-  MAX_BEDS,
   isValidRoom,
   getDefaultRoom,
   getNextValidRoom,
@@ -75,13 +74,6 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
     });
   };
 
-  const handleBedStep = (delta: number) => {
-    const current = parseInt(patient.cama, 10);
-    if (!isNaN(current)) {
-      const next = Math.min(MAX_BEDS, Math.max(1, current + delta));
-      onChange({ cama: String(next) });
-    }
-  };
 
   const handleRoomStep = (delta: number) => {
     const nextRoom = getNextValidRoom(patient.sector, patient.habitacion, delta);
@@ -123,7 +115,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
   }, [records, activeRound, patient.sector]);
 
   return (
-    <div className="bg-white border-b border-slate-200 shadow-xs sticky top-0 z-20 px-2.5 py-2 md:px-4 md:py-3 transition-all">
+    <div className="bg-white border-b border-slate-200 shadow-xs sticky z-20 px-2.5 py-2 md:px-4 md:py-3 transition-all" style={{ top: 'var(--header-height)' }}>
       {/* Barra superior: Ronda activa, reloj, Wake Lock y avance */}
       <div className="flex items-center justify-between gap-1.5 mb-1.5">
         <div className="flex items-center gap-1.5 flex-wrap min-w-0">
@@ -192,7 +184,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
           <button
             type="button"
             onClick={onNextBed}
-            className="flex items-center gap-1 bg-gradient-to-r from-sky-600 to-cyan-600 text-white text-xs md:text-sm font-bold px-2.5 py-1 md:py-1.5 rounded-lg shadow-xs hover:from-sky-700 hover:to-cyan-700 touch-active cursor-pointer shrink-0"
+            className="flex items-center gap-1 bg-linear-to-r from-sky-600 to-cyan-600 text-white text-xs md:text-sm font-bold px-2.5 py-1 md:py-1.5 rounded-lg shadow-xs hover:from-sky-700 hover:to-cyan-700 touch-active cursor-pointer shrink-0"
             title="Mantener sector y habitación, e incrementar la cama"
           >
             <Bed className="w-3.5 h-3.5" />
@@ -213,7 +205,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
               key={sec}
               type="button"
               onClick={() => handleSectorChange(sec)}
-              className={`min-w-[36px] md:min-w-[40px] h-8 md:h-9 px-2 md:px-2.5 rounded-lg font-bold text-xs md:text-sm border transition-all touch-active cursor-pointer shrink-0 ${
+              className={`min-w-9 md:min-w-10 h-8 md:h-9 px-2 md:px-2.5 rounded-lg font-bold text-xs md:text-sm border transition-all touch-active cursor-pointer shrink-0 ${
                 patient.sector === sec
                   ? 'bg-sky-700 text-white border-sky-700 shadow-xs ring-2 ring-sky-200'
                   : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
@@ -246,12 +238,12 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
         <div className="flex items-center gap-2 md:gap-3">
           {/* Stepper Enfermeras */}
           <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-1.5 py-0.5 shadow-2xs">
-            <span className="text-[10px] md:text-[11px] font-bold text-slate-600">Enf:</span>
+            <span className="text-[11px] md:text-xs font-bold text-slate-600">Enf:</span>
             <div className="flex items-center gap-0.5">
               <button
                 type="button"
                 onClick={() => handleStaffChange('enfermeras', -1)}
-                className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs cursor-pointer touch-active"
+                className="w-8 h-8 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs cursor-pointer touch-active relative before:absolute before:-inset-2 before:content-['']"
                 title="Restar enfermera"
               >
                 <Minus className="w-3 h-3" />
@@ -262,7 +254,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
               <button
                 type="button"
                 onClick={() => handleStaffChange('enfermeras', 1)}
-                className="w-6 h-6 rounded bg-sky-600 hover:bg-sky-700 text-white flex items-center justify-center font-bold text-xs cursor-pointer touch-active"
+                className="w-8 h-8 rounded-md bg-sky-600 hover:bg-sky-700 text-white flex items-center justify-center font-bold text-xs cursor-pointer touch-active relative before:absolute before:-inset-2 before:content-['']"
                 title="Sumar enfermera"
               >
                 <Plus className="w-3 h-3" />
@@ -272,12 +264,12 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
 
           {/* Stepper Auxiliares */}
           <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-1.5 py-0.5 shadow-2xs">
-            <span className="text-[10px] md:text-[11px] font-bold text-slate-600">Aux:</span>
+            <span className="text-[11px] md:text-xs font-bold text-slate-600">Aux:</span>
             <div className="flex items-center gap-0.5">
               <button
                 type="button"
                 onClick={() => handleStaffChange('auxiliares', -1)}
-                className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs cursor-pointer touch-active"
+                className="w-8 h-8 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs cursor-pointer touch-active relative before:absolute before:-inset-2 before:content-['']"
                 title="Restar auxiliar"
               >
                 <Minus className="w-3 h-3" />
@@ -288,7 +280,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
               <button
                 type="button"
                 onClick={() => handleStaffChange('auxiliares', 1)}
-                className="w-6 h-6 rounded bg-sky-600 hover:bg-sky-700 text-white flex items-center justify-center font-bold text-xs cursor-pointer touch-active"
+                className="w-8 h-8 rounded-md bg-sky-600 hover:bg-sky-700 text-white flex items-center justify-center font-bold text-xs cursor-pointer touch-active relative before:absolute before:-inset-2 before:content-['']"
                 title="Sumar auxiliar"
               >
                 <Plus className="w-3 h-3" />
@@ -312,11 +304,11 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
             />
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-1">
-                <span className="text-[9px] md:text-[10px] uppercase font-bold text-slate-600 leading-tight">
+                <span className="text-[11px] md:text-xs uppercase font-bold text-slate-600 leading-tight">
                   Hab
                 </span>
                 {sectorConfig && (
-                  <span className="text-[8px] md:text-[9px] text-slate-500 font-mono hidden xs:inline">
+                  <span className="text-[10px] md:text-[11px] text-slate-500 font-mono hidden xs:inline">
                     ({sectorConfig.min}-{sectorConfig.max})
                   </span>
                 )}
@@ -336,7 +328,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
             <button
               type="button"
               onClick={() => handleRoomStep(-1)}
-              className="w-6 h-6 md:w-7 md:h-7 rounded-md bg-white border border-slate-200 text-slate-600 flex items-center justify-center font-bold text-xs hover:bg-slate-100 touch-active cursor-pointer"
+              className="w-8 h-8 md:w-9 md:h-9 rounded-md bg-white border border-slate-200 text-slate-600 flex items-center justify-center font-bold text-xs hover:bg-slate-100 touch-active cursor-pointer relative before:absolute before:-inset-1 before:content-['']"
               title="Habitación anterior válida"
             >
               <Minus className="w-3 h-3" />
@@ -344,7 +336,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
             <button
               type="button"
               onClick={() => handleRoomStep(1)}
-              className="w-6 h-6 md:w-7 md:h-7 rounded-md bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs hover:bg-slate-300 touch-active cursor-pointer"
+              className="w-8 h-8 md:w-9 md:h-9 rounded-md bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs hover:bg-slate-300 touch-active cursor-pointer relative before:absolute before:-inset-1 before:content-['']"
               title="Siguiente habitación válida"
             >
               <Plus className="w-3 h-3" />
@@ -356,7 +348,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
         <div className="col-span-6 sm:col-span-3 flex items-center bg-slate-50 border border-slate-200 rounded-xl px-2 py-1 focus-within:border-sky-500 focus-within:bg-white focus-within:ring-1 focus-within:ring-sky-100">
           <FileText className="w-3.5 h-3.5 text-slate-500 mr-1.5 shrink-0" />
           <div className="flex flex-col flex-1 min-w-0">
-            <span className="text-[9px] md:text-[10px] uppercase font-bold text-slate-600 leading-tight">
+            <span className="text-[11px] md:text-xs uppercase font-bold text-slate-600 leading-tight">
               HC (Hist. Clínica)
             </span>
             <input
@@ -373,7 +365,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
         <div className="col-span-12 sm:col-span-5 flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-2 py-1">
           <div className="flex items-center gap-1.5 flex-1 overflow-x-auto">
             <Bed className="w-3.5 h-3.5 text-slate-600 shrink-0" />
-            <span className="text-[9px] md:text-[10px] uppercase font-bold text-slate-600 mr-0.5 shrink-0">
+            <span className="text-[11px] md:text-xs uppercase font-bold text-slate-600 mr-0.5 shrink-0">
               Cama:
             </span>
             {COMMON_BEDS.map((bedNum) => (
@@ -381,7 +373,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
                 key={bedNum}
                 type="button"
                 onClick={() => onChange({ cama: bedNum })}
-                className={`flex-1 sm:flex-none w-8 h-7 md:w-8 md:h-8 rounded-lg font-bold text-xs md:text-sm border transition-all touch-active cursor-pointer ${
+                className={`flex-1 sm:flex-none w-10 h-10 rounded-lg font-bold text-xs md:text-sm border transition-all touch-active cursor-pointer ${
                   patient.cama === bedNum
                     ? 'bg-sky-700 text-white border-sky-700 shadow-xs'
                     : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
@@ -392,25 +384,6 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
             ))}
           </div>
 
-          {/* Stepper +/- 1..4 */}
-          <div className="flex items-center gap-0.5 pl-1.5 border-l border-slate-200 shrink-0">
-            <button
-              type="button"
-              onClick={() => handleBedStep(-1)}
-              className="w-6 h-6 md:w-7 md:h-7 rounded-md bg-white border border-slate-200 text-slate-600 flex items-center justify-center font-bold text-xs hover:bg-slate-100 touch-active cursor-pointer"
-              title="Restar cama"
-            >
-              <Minus className="w-2.5 h-2.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => handleBedStep(1)}
-              className="w-6 h-6 md:w-7 md:h-7 rounded-md bg-sky-50 border border-sky-200 text-sky-700 flex items-center justify-center font-bold text-xs hover:bg-sky-100 touch-active cursor-pointer"
-              title="Sumar cama"
-            >
-              <Plus className="w-2.5 h-2.5" />
-            </button>
-          </div>
         </div>
       </div>
 

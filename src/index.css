@@ -9,6 +9,13 @@
     --app-primary-light: #e0f2fe;
     --app-success: #10b981;
     --app-danger: #ef4444;
+    --header-height: 57px;
+  }
+
+  @media (min-width: 768px) {
+    :root {
+      --header-height: 65px;
+    }
   }
 
   html {

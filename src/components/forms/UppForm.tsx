@@ -13,7 +13,6 @@ import {
 import type { BasePatientData, UppForm as UppFormType } from '../../types/form';
 import { ToggleYesNo } from '../common/ToggleYesNo';
 import { TouchChip } from '../common/TouchChip';
-import { StickyBottomBar } from '../common/StickyBottomBar';
 import { getCurrentDateISO } from '../../utils/dateUtils';
 
 interface UppFormProps {
@@ -34,7 +33,8 @@ const COMMON_TREATMENTS = [
   'Curación Plana',
   'Platsul / Sulfadiazina',
   'DuoDerm / Hidrocoloide',
-  'Alginato de Calcio',
+  'Colagenasa (Iruxol)',
+  'Alginato',
   'Cavilon / Film Protector',
   'Solución Fisiológica',
   'Sacarosa (Azúcar)',
@@ -44,6 +44,7 @@ const INITIAL_UPP_STATE = {
   tieneUpp: false,
   fechaIngreso: getCurrentDateISO(),
   pasoAreaCerrada: false,
+  areaCerradaCual: '',
   cuantas: 1,
   ubicacionSacra: false,
   ubicacionTalon: false,
@@ -55,13 +56,17 @@ const INITIAL_UPP_STATE = {
   gradoIII: false,
   gradoIV: false,
   tieneTratamiento: true,
-  tipoTratamiento: '',
+  tratamientos: [] as string[],
+  otroTratamiento: '',
   tieneDispositivoApoyo: false,
   dispositivoAro: false,
   dispositivoGuantesAgua: false,
   dispositivoOtro: '',
   escalaBraden: 15,
-  nutricion: 'oral' as 'oral' | 'NPT' | 'enteral SN' | 'enteral BG' | '',
+  nutricionOral: true,
+  nutricionNpt: false,
+  nutricionEnteralSn: false,
+  nutricionEnteralBg: false,
   colchonAntiEscaras: true,
   observacionesColchon: '',
 };
@@ -92,13 +97,43 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  const toggleTratamiento = (treat: string) => {
+    setForm((prev) => {
+      const exists = prev.tratamientos.includes(treat);
+      return {
+        ...prev,
+        tratamientos: exists
+          ? prev.tratamientos.filter((t) => t !== treat)
+          : [...prev.tratamientos, treat],
+      };
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
+      const allTreatments = [...form.tratamientos];
+      if (form.otroTratamiento.trim()) {
+        allTreatments.push(form.otroTratamiento.trim());
+      }
+      const tipoTratamientoStr = allTreatments.join(', ');
+
+      const nutricionList = [
+        form.nutricionOral && 'Oral',
+        form.nutricionNpt && 'NPT',
+        form.nutricionEnteralSn && 'Enteral (Sonda Naso)',
+        form.nutricionEnteralBg && 'Enteral (Botón Gástrico)',
+      ]
+        .filter(Boolean)
+        .join(', ');
+
       const fullData: UppFormType = {
         ...patient,
         ...form,
+        tratamientos: allTreatments,
+        tipoTratamiento: tipoTratamientoStr,
+        nutricion: nutricionList,
         dispositivoOtro: hasOtroDispositivo ? form.dispositivoOtro : '',
       };
       await onSubmit(fullData);
@@ -129,7 +164,7 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
     <form
       id="upp-form"
       onSubmit={handleSubmit}
-      className="px-3 pb-32 md:px-4 space-y-3.5 max-w-2xl mx-auto"
+      className="px-3 pb-12 md:px-4 space-y-3.5 max-w-2xl mx-auto"
     >
       {/* Pregunta Clave de Mínimos Clicks */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
@@ -157,7 +192,7 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full min-h-[56px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-base md:text-lg hidden md:flex items-center justify-center gap-2 shadow-lg shadow-emerald-200 touch-active cursor-pointer transition-all"
+            className="w-full min-h-[56px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-base md:text-lg flex items-center justify-center gap-2 shadow-lg shadow-emerald-200 touch-active cursor-pointer transition-all"
           >
             <CheckCircle className="w-5 h-5" />
             <span>{isSubmitting ? 'Guardando...' : 'Guardar Paciente (Sin UPP / Piel Íntegra)'}</span>
@@ -211,7 +246,7 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
 
               <div>
                 <label className="text-[11px] font-bold text-slate-600 uppercase block mb-1">
-                  ¿Pasó por Área Cerrada? (UTI / UCO)
+                  ¿Pasó por Área Cerrada?
                 </label>
                 <div className="grid grid-cols-2 gap-2 min-h-[44px]">
                   <button
@@ -227,7 +262,7 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
                   </button>
                   <button
                     type="button"
-                    onClick={() => setForm((p) => ({ ...p, pasoAreaCerrada: false }))}
+                    onClick={() => setForm((p) => ({ ...p, pasoAreaCerrada: false, areaCerradaCual: '' }))}
                     className={`rounded-xl font-bold text-xs border touch-active cursor-pointer ${
                       !form.pasoAreaCerrada
                         ? 'bg-slate-700 text-white border-slate-700 shadow-xs'
@@ -239,6 +274,38 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
                 </div>
               </div>
             </div>
+
+            {/* Selector de Servicio Cerrado si respondió SÍ */}
+            {form.pasoAreaCerrada && (
+              <div className="pt-2 border-t border-slate-100 space-y-2 animate-fade-in">
+                <span className="text-[11px] font-bold text-slate-600 uppercase block">
+                  Selecciona o escribe el Área Cerrada de origen:
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {['UTI', 'UCO', 'Quirófano', 'Shock Room', 'Piso / Sala'].map((area) => (
+                    <button
+                      key={area}
+                      type="button"
+                      onClick={() => setForm((p) => ({ ...p, areaCerradaCual: area }))}
+                      className={`text-xs font-semibold px-3 py-1.5 rounded-xl border transition-all touch-active cursor-pointer ${
+                        form.areaCerradaCual === area
+                          ? 'bg-rose-700 text-white border-rose-700 shadow-xs'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {area}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  value={form.areaCerradaCual}
+                  onChange={(e) => setForm((p) => ({ ...p, areaCerradaCual: e.target.value }))}
+                  placeholder="O escribe otra área específica..."
+                  className="w-full min-h-[44px] px-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-slate-50 focus:bg-white"
+                />
+              </div>
+            )}
           </div>
 
           {/* 2. Cantidad y Ubicación Anatómica */}
@@ -349,29 +416,32 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
                   Tipo de Curación / Tratamiento
                 </label>
 
-                {/* Chips de insumos rápidos incluyendo Sacarosa (Azúcar) */}
+                {/* Chips de insumos rápidos con selección múltiple */}
                 <div className="flex flex-wrap gap-1.5 mb-2">
-                  {COMMON_TREATMENTS.map((treat) => (
-                    <button
-                      key={treat}
-                      type="button"
-                      onClick={() => setForm((p) => ({ ...p, tipoTratamiento: treat }))}
-                      className={`text-xs font-semibold px-2.5 py-1.5 rounded-xl border transition-all touch-active cursor-pointer ${
-                        form.tipoTratamiento === treat
-                          ? 'bg-rose-700 text-white border-rose-700 shadow-xs'
-                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      <Sparkles className="w-3 h-3 inline mr-1 text-amber-500" />
-                      {treat}
-                    </button>
-                  ))}
+                  {COMMON_TREATMENTS.map((treat) => {
+                    const isSelected = form.tratamientos.includes(treat);
+                    return (
+                      <button
+                        key={treat}
+                        type="button"
+                        onClick={() => toggleTratamiento(treat)}
+                        className={`text-xs font-semibold px-2.5 py-1.5 rounded-xl border transition-all touch-active cursor-pointer ${
+                          isSelected
+                            ? 'bg-rose-700 text-white border-rose-700 shadow-xs'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <Sparkles className="w-3 h-3 inline mr-1 text-amber-500" />
+                        {treat}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <input
                   type="text"
-                  value={form.tipoTratamiento}
-                  onChange={(e) => setForm((p) => ({ ...p, tipoTratamiento: e.target.value }))}
+                  value={form.otroTratamiento}
+                  onChange={(e) => setForm((p) => ({ ...p, otroTratamiento: e.target.value }))}
                   placeholder="O escribe otro tratamiento personalizado..."
                   className="w-full min-h-[44px] px-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-slate-50 focus:bg-white"
                 />
@@ -526,26 +596,33 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
             </div>
           </div>
 
-          {/* 6. Nutrición */}
+          {/* 6. Nutrición (Multi-selección) */}
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-2">
             <span className="block font-bold text-slate-800 text-sm flex items-center gap-1.5">
               <HeartPulse className="w-4 h-4 text-rose-700" />
-              Tipo de Nutrición
+              Tipo de Nutrición (Selección múltiple)
             </span>
             <div className="grid grid-cols-2 gap-2">
-              {[
-                { id: 'oral' as const, label: 'Oral' },
-                { id: 'NPT' as const, label: 'NPT (Parenteral)' },
-                { id: 'enteral SN' as const, label: 'Enteral (Sonda Naso)' },
-                { id: 'enteral BG' as const, label: 'Enteral (Botón Gástrico)' },
-              ].map((item) => (
-                <TouchChip
-                  key={item.id}
-                  label={item.label}
-                  selected={form.nutricion === item.id}
-                  onClick={() => setForm((p) => ({ ...p, nutricion: item.id }))}
-                />
-              ))}
+              <TouchChip
+                label="Oral"
+                selected={form.nutricionOral}
+                onClick={() => setForm((p) => ({ ...p, nutricionOral: !p.nutricionOral }))}
+              />
+              <TouchChip
+                label="NPT (Parenteral)"
+                selected={form.nutricionNpt}
+                onClick={() => setForm((p) => ({ ...p, nutricionNpt: !p.nutricionNpt }))}
+              />
+              <TouchChip
+                label="Enteral (Sonda Naso)"
+                selected={form.nutricionEnteralSn}
+                onClick={() => setForm((p) => ({ ...p, nutricionEnteralSn: !p.nutricionEnteralSn }))}
+              />
+              <TouchChip
+                label="Enteral (Botón Gástrico)"
+                selected={form.nutricionEnteralBg}
+                onClick={() => setForm((p) => ({ ...p, nutricionEnteralBg: !p.nutricionEnteralBg }))}
+              />
             </div>
           </div>
 
@@ -572,7 +649,7 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
           </div>
 
           {/* Botón Principal Guardar */}
-          <div className="pt-2 hidden md:block">
+          <div className="pt-3">
             <button
               type="submit"
               disabled={isSubmitting}
@@ -587,17 +664,6 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
           </div>
         </div>
       )}
-
-      {/* Barra de Guardado Flotante en la Zona del Pulgar */}
-      <StickyBottomBar
-        formId="upp-form"
-        isSubmitting={isSubmitting}
-        cama={patient.cama}
-        habitacion={patient.habitacion}
-        sector={patient.sector}
-        hasCondition={form.tieneUpp}
-        roundType="UPP"
-      />
     </form>
   );
 };

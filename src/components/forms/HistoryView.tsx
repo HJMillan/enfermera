@@ -9,10 +9,11 @@ import {
   Bandage,
   ChevronDown,
   ChevronUp,
+  Trash2,
 } from 'lucide-react';
 import type { StoredRecord, AccesoPerifericoForm, UppForm } from '../../types/form';
 import { retryRecordSync } from '../../services/webhookService';
-import { exportRecordsToCSV } from '../../services/storageService';
+import { exportRecordsToCSV, deleteRecordLocally, clearStoredRecords } from '../../services/storageService';
 
 interface HistoryViewProps {
   records: StoredRecord[];
@@ -72,11 +73,28 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
             <button
               type="button"
               onClick={exportRecordsToCSV}
-              className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs flex items-center gap-1.5 touch-active shadow-sm"
+              className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs flex items-center gap-1.5 touch-active shadow-sm cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Exportar CSV</span>
             </button>
+
+            {records.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('¿Deseas eliminar TODOS los registros guardados del turno actual? Esta acción no se puede deshacer.')) {
+                    clearStoredRecords();
+                    onRefresh();
+                  }
+                }}
+                className="px-2.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs flex items-center gap-1 touch-active shadow-xs cursor-pointer"
+                title="Limpiar todos los registros guardados"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Limpiar turno</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -233,6 +251,21 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                       </span>
                     )}
 
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (window.confirm(`¿Eliminar registro de Sec ${item.data.sector} Hab ${item.data.habitacion} Cama ${item.data.cama}?`)) {
+                          deleteRecordLocally(item.id);
+                          onRefresh();
+                        }
+                      }}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all touch-active cursor-pointer"
+                      title="Eliminar este registro"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+
                     {isExpanded ? (
                       <ChevronUp className="w-4 h-4 text-slate-600" />
                     ) : (
@@ -303,6 +336,13 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                       </div>
                     )}
 
+                    {isAcceso && dataAcceso?.observaciones && (
+                      <div className="pt-1 border-t border-slate-200/60 text-slate-700">
+                        <span className="font-bold text-slate-600 block">Observaciones:</span>
+                        <span className="italic text-slate-800">{dataAcceso.observaciones}</span>
+                      </div>
+                    )}
+
                     {!isAcceso && dataUpp && dataUpp.tieneUpp && (
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 border-t border-slate-200/60 text-slate-700">
                         <div>
@@ -311,7 +351,11 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                         </div>
                         <div>
                           <span className="font-bold text-slate-600 block">Área Cerrada:</span>
-                          <span>{dataUpp.pasoAreaCerrada ? 'SÍ' : 'NO'}</span>
+                          <span>
+                            {dataUpp.pasoAreaCerrada
+                              ? `SÍ${dataUpp.areaCerradaCual ? ` (${dataUpp.areaCerradaCual})` : ''}`
+                              : 'NO'}
+                          </span>
                         </div>
                         <div>
                           <span className="font-bold text-slate-600 block">Cantidad:</span>
@@ -327,7 +371,11 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                         </div>
                         <div>
                           <span className="font-bold text-slate-600 block">Tratamiento:</span>
-                          <span>{dataUpp.tipoTratamiento || '-'}</span>
+                          <span>
+                            {Array.isArray(dataUpp.tratamientos) && dataUpp.tratamientos.length > 0
+                              ? dataUpp.tratamientos.join(', ')
+                              : (dataUpp.tipoTratamiento || '-')}
+                          </span>
                         </div>
                         <div>
                           <span className="font-bold text-slate-600 block">Dispositivo Apoyo:</span>
@@ -345,7 +393,14 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                         </div>
                         <div>
                           <span className="font-bold text-slate-600 block">Nutrición:</span>
-                          <span>{dataUpp.nutricion || '-'}</span>
+                          <span>
+                            {[
+                              (dataUpp.nutricionOral || dataUpp.nutricion === 'oral') && 'Oral',
+                              (dataUpp.nutricionNpt || dataUpp.nutricion === 'NPT') && 'NPT',
+                              (dataUpp.nutricionEnteralSn || dataUpp.nutricion === 'enteral SN') && 'Enteral SN',
+                              (dataUpp.nutricionEnteralBg || dataUpp.nutricion === 'enteral BG') && 'Enteral BG',
+                            ].filter(Boolean).join(', ') || dataUpp.nutricion || '-'}
+                          </span>
                         </div>
                         <div>
                           <span className="font-bold text-slate-600 block">Colchón Anti-escaras:</span>

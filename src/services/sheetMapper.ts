@@ -39,7 +39,8 @@ export const ACCESO_PERIFERICO_HEADERS = [
   'Infiltración',        // AI
   'Eritematoso',         // AJ
   'Retorno',             // AK
-  'Infusión Tipo'        // AL
+  'Infusión Tipo',       // AL
+  'Observaciones'        // AM
 ];
 
 export function mapAccesoPerifericoToRow(data: AccesoPerifericoForm): (string | number | boolean)[] {
@@ -85,7 +86,8 @@ export function mapAccesoPerifericoToRow(data: AccesoPerifericoForm): (string | 
     tiene && data.caracteristicasInfiltracion ? 'SI' : '',                          // AI
     tiene && data.caracteristicasEritematoso ? 'SI' : '',                           // AJ
     tiene && data.caracteristicasRetorno ? 'SI' : '',                               // AK
-    tiene ? (data.infusionType || '') : ''                                          // AL
+    tiene ? (data.infusionType || '') : '',                                         // AL
+    data.observaciones || ''                                                        // AM
   ];
 }
 
@@ -131,6 +133,10 @@ export const UPP_HEADERS = [
 
 export function mapUppToRow(data: UppForm): (string | number | boolean)[] {
   const tiene = Boolean(data.tieneUpp);
+  const listaTratamientos = Array.isArray(data.tratamientos) && data.tratamientos.length > 0
+    ? data.tratamientos.join(', ')
+    : (data.tipoTratamiento || '');
+
   return [
     data.fechaHora,                                                                 // A
     data.sector,                                                                    // B
@@ -140,7 +146,7 @@ export function mapUppToRow(data: UppForm): (string | number | boolean)[] {
     data.cantidadEnfermeras ?? '',                                                  // F
     data.cantidadAuxiliares ?? '',                                                  // G
     data.fechaIngreso || '',                                                        // H
-    data.pasoAreaCerrada ? 'SI' : 'NO',                                             // I
+    data.pasoAreaCerrada ? (data.areaCerradaCual ? `SI (${data.areaCerradaCual})` : 'SI') : 'NO', // I
     tiene ? 'SI' : '',                                                              // J
     !tiene ? 'NO' : '',                                                             // K
     tiene ? (data.cuantas ?? 1) : 0,                                                // L
@@ -154,17 +160,17 @@ export function mapUppToRow(data: UppForm): (string | number | boolean)[] {
     tiene && data.gradoIII ? 'SI' : '',                                             // T
     tiene && data.gradoIV ? 'SI' : '',                                              // U
     tiene ? (data.tieneTratamiento ? 'SI' : 'NO') : '',                             // V
-    tiene ? (data.tipoTratamiento || '') : '',                                      // W
-    tiene ? (data.tipoTratamiento ? 'Activo' : '') : '',                            // X
+    tiene ? listaTratamientos : '',                                                 // W
+    tiene ? (listaTratamientos ? 'Activo' : '') : '',                               // X
     tiene ? (data.tieneDispositivoApoyo ? 'SI' : 'NO') : '',                        // Y
     tiene && data.tieneDispositivoApoyo && data.dispositivoAro ? 'SI' : '',         // Z
     tiene && data.tieneDispositivoApoyo && data.dispositivoGuantesAgua ? 'SI' : '', // AA
     tiene && data.tieneDispositivoApoyo && data.dispositivoOtro ? data.dispositivoOtro : '', // AB
     tiene ? (data.escalaBraden ?? '') : '',                                         // AC
-    tiene && data.nutricion === 'oral' ? 'SI' : '',                                 // AD
-    tiene && data.nutricion === 'NPT' ? 'SI' : '',                                  // AE
-    tiene && data.nutricion === 'enteral SN' ? 'SI' : '',                           // AF
-    tiene && data.nutricion === 'enteral BG' ? 'SI' : '',                           // AG
+    tiene && (data.nutricionOral || data.nutricion === 'oral') ? 'SI' : '',         // AD
+    tiene && (data.nutricionNpt || data.nutricion === 'NPT') ? 'SI' : '',           // AE
+    tiene && (data.nutricionEnteralSn || data.nutricion === 'enteral SN') ? 'SI' : '', // AF
+    tiene && (data.nutricionEnteralBg || data.nutricion === 'enteral BG') ? 'SI' : '', // AG
     tiene ? (data.colchonAntiEscaras ? 'SI' : '') : '',                             // AH
     tiene ? (!data.colchonAntiEscaras ? 'NO' : '') : '',                            // AI
     tiene ? (data.observacionesColchon || '') : ''                                  // AJ

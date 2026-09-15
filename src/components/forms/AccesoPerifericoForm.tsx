@@ -14,7 +14,6 @@ import {
 import type { BasePatientData, AccesoPerifericoForm as AccesoFormType } from '../../types/form';
 import { ToggleYesNo } from '../common/ToggleYesNo';
 import { TouchChip } from '../common/TouchChip';
-import { StickyBottomBar } from '../common/StickyBottomBar';
 
 interface AccesoPerifericoFormProps {
   patient: BasePatientData;
@@ -61,6 +60,7 @@ const INITIAL_ACCESO_STATE = {
   caracteristicasEritematoso: false,
   caracteristicasRetorno: true,
   infusionType: 'continua' as 'continua' | 'intermitente' | '',
+  observaciones: '',
 };
 
 export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
@@ -210,7 +210,7 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
     <form
       id="acceso-periferico-form"
       onSubmit={handleSubmit}
-      className="px-3 pb-32 md:px-4 space-y-3.5 max-w-2xl mx-auto"
+      className="px-3 pb-12 md:px-4 space-y-3.5 max-w-2xl mx-auto"
     >
       {/* Pregunta Clave de Mínimos Clicks */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
@@ -297,8 +297,22 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
           {form.tipoAccesoAlternativo === 'percutaneo' &&
             renderRotuloSection('Rótulo de Percutáneo')}
 
+          {/* Observaciones libres */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-1.5">
+            <label className="text-[11px] font-bold text-slate-600 uppercase block">
+              Observaciones / Notas adicionales (opcional)
+            </label>
+            <input
+              type="text"
+              value={form.observaciones}
+              onChange={(e) => setForm((p) => ({ ...p, observaciones: e.target.value }))}
+              placeholder="Ej: Acceso central normofuncional, retiro programado, etc..."
+              className="w-full min-h-[44px] px-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-slate-50 focus:bg-white"
+            />
+          </div>
+
           {/* Botón de Guardar en caso de NO tener acceso periférico */}
-          <div className="pt-1 hidden md:block">
+          <div className="pt-2">
             <button
               type="submit"
               disabled={isSubmitting}
@@ -578,8 +592,22 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
             </div>
           </div>
 
+          {/* 7. Observaciones libres */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-1.5">
+            <label className="text-[11px] font-bold text-slate-600 uppercase block">
+              Observaciones / Notas adicionales (opcional)
+            </label>
+            <input
+              type="text"
+              value={form.observaciones}
+              onChange={(e) => setForm((p) => ({ ...p, observaciones: e.target.value }))}
+              placeholder="Ej: Calibre 20G en flexura, vía difícil, próximo cambio, etc..."
+              className="w-full min-h-[44px] px-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-slate-50 focus:bg-white"
+            />
+          </div>
+
           {/* Botón Principal de Guardar */}
-          <div className="pt-2 hidden md:block">
+          <div className="pt-3">
             <button
               type="submit"
               disabled={isSubmitting}
@@ -594,18 +622,6 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
           </div>
         </div>
       )}
-
-      {/* Barra de Guardado Flotante en la Zona del Pulgar */}
-      <StickyBottomBar
-        formId="acceso-periferico-form"
-        isSubmitting={isSubmitting}
-        cama={patient.cama}
-        habitacion={patient.habitacion}
-        sector={patient.sector}
-        hasCondition={form.tieneAcceso}
-        roundType="ACCESO_PERIFERICO"
-        altType={form.tipoAccesoAlternativo}
-      />
     </form>
   );
 };
