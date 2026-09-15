@@ -60,8 +60,9 @@ export interface AccesoPerifericoForm extends BasePatientData {
   infusionType?: 'continua' | 'intermitente' | '';
 
   // Opciones cuando NO tiene acceso periférico
-  tipoAccesoAlternativo?: 'acceso_central' | 'percutaneo' | 'nada' | '';
+  tipoAccesoAlternativo?: 'acceso_central' | 'percutaneo' | 'nada' | 'ausente' | string;
   accesoCentralUbicacion?: 'Y/I' | 'Y/D' | 'S/I' | 'S/D' | '';
+  motivoAusente?: string;
 
   // Observaciones libres
   observaciones?: string;
@@ -70,6 +71,7 @@ export interface AccesoPerifericoForm extends BasePatientData {
 // 2. Úlceras por Presión (UPP)
 export interface UppForm extends BasePatientData {
   tieneUpp: boolean;
+  motivoAusente?: string;
   fechaIngreso?: string;
   pasoAreaCerrada?: boolean;
   areaCerradaCual?: string;
@@ -109,6 +111,7 @@ export interface UppForm extends BasePatientData {
   nutricionEnteralBg?: boolean;
   colchonAntiEscaras?: boolean;
   observacionesColchon?: string;
+  observaciones?: string;
 }
 
 export type FormType = 'ACCESO_PERIFERICO' | 'UPP';

@@ -29,6 +29,7 @@ var HEADERS_ACCESO_PERIFERICO = [
   'Tegaderm', 'Cinta', 'Tipo Cinta', 'Hipafix', 'Venda', 'Contención Mec.',
   'Adherencia', 'Llave 3 Vías', 'Tapón Multif.',
   'Infiltración', 'Eritematoso', 'Retorno', 'Infusión',
+  'Observaciones',
   'Mail Enviado'
 ];
 

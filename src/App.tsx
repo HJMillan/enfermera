@@ -143,9 +143,17 @@ export default function App() {
       handlePatientChange({ cama: String(Math.min(MAX_BEDS, currentBed + 1)) });
     }
 
+    const situacionTexto = formData.tieneAcceso
+      ? 'Con vía'
+      : formData.tipoAccesoAlternativo === 'acceso_central'
+      ? 'Acceso Central'
+      : formData.tipoAccesoAlternativo === 'percutaneo'
+      ? 'Percutáneo'
+      : formData.motivoAusente || (formData.tipoAccesoAlternativo === 'ausente' ? 'Ausente' : 'Sin vía');
+
     setToast({
       type: 'success',
-      message: `✅ Vía: Sec ${formData.sector} Hab ${formData.habitacion} Cama ${formData.cama} (${formData.tieneAcceso ? 'Con vía' : formData.tipoAccesoAlternativo === 'acceso_central' ? 'Acceso Central' : formData.tipoAccesoAlternativo === 'percutaneo' ? 'Percutáneo' : 'Sin vía'})`,
+      message: `✅ Vía: Sec ${formData.sector} Hab ${formData.habitacion} Cama ${formData.cama} (${situacionTexto})`,
       action: res.recordId
         ? {
             label: 'Deshacer',
@@ -170,9 +178,15 @@ export default function App() {
       handlePatientChange({ cama: String(Math.min(MAX_BEDS, currentBed + 1)) });
     }
 
+    const situacionUppTexto = formData.tieneUpp
+      ? 'Con UPP'
+      : formData.motivoAusente
+      ? formData.motivoAusente
+      : 'Piel Íntegra';
+
     setToast({
       type: 'success',
-      message: `✅ UPP: Sec ${formData.sector} Hab ${formData.habitacion} Cama ${formData.cama} (${formData.tieneUpp ? 'Con UPP' : 'Piel Íntegra'})`,
+      message: `✅ UPP: Sec ${formData.sector} Hab ${formData.habitacion} Cama ${formData.cama} (${situacionUppTexto})`,
       action: res.recordId
         ? {
             label: 'Deshacer',
@@ -377,6 +391,7 @@ export default function App() {
           <div className="w-full pt-1">
             {activeTab === 'ACCESO_PERIFERICO' && (
               <AccesoPerifericoForm
+                key={`${patient.sector}-${patient.habitacion}-${patient.cama}`}
                 patient={patient}
                 onSubmit={handleAccesoSubmit}
                 onSwitchToUpp={() => setActiveTab('UPP')}
@@ -385,6 +400,7 @@ export default function App() {
 
             {activeTab === 'UPP' && (
               <UppForm
+                key={`${patient.sector}-${patient.habitacion}-${patient.cama}`}
                 patient={patient}
                 onSubmit={handleUppSubmit}
                 onOpenShiftClose={() => setIsShiftModalOpen(true)}

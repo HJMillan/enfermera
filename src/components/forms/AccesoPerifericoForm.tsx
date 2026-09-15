@@ -14,6 +14,7 @@ import {
 import type { BasePatientData, AccesoPerifericoForm as AccesoFormType } from '../../types/form';
 import { ToggleYesNo } from '../common/ToggleYesNo';
 import { TouchChip } from '../common/TouchChip';
+import { BedStatusSelector } from '../common/BedStatusSelector';
 
 interface AccesoPerifericoFormProps {
   patient: BasePatientData;
@@ -32,8 +33,9 @@ type CintaTipo = 'hipoalergénica' | 'tela' | 'seda' | 'coban' | 'papel' | '';
 
 const INITIAL_ACCESO_STATE = {
   tieneAcceso: false,
-  tipoAccesoAlternativo: '' as 'acceso_central' | 'percutaneo' | 'nada' | '',
+  tipoAccesoAlternativo: 'nada' as 'acceso_central' | 'percutaneo' | 'nada' | 'ausente' | string,
   accesoCentralUbicacion: '' as 'Y/I' | 'Y/D' | 'S/I' | 'S/D' | '',
+  motivoAusente: '',
   cuantas: 1,
   ubicacionMSD: false,
   ubicacionMSI: false,
@@ -160,9 +162,8 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {[
               { key: 'rotuloTieneFecha' as const, label: 'Fecha' },
-              { key: 'rotuloTieneNombre' as const, label: 'Nombre' },
-              { key: 'rotuloTieneLegajo' as const, label: 'Legajo' },
               { key: 'rotuloTieneEnfermero' as const, label: 'Enfermero' },
+              { key: 'rotuloTieneLegajo' as const, label: 'Legajo' },
               { key: 'rotuloTieneTurno' as const, label: 'Turno' },
               { key: 'rotuloTieneABB' as const, label: 'ABB' },
             ].map((item) => {
@@ -176,7 +177,13 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
                   <div className="flex gap-1">
                     <button
                       type="button"
-                      onClick={() => setForm((p) => ({ ...p, [item.key]: true }))}
+                      onClick={() =>
+                        setForm((p) => ({
+                          ...p,
+                          [item.key]: true,
+                          ...(item.key === 'rotuloTieneEnfermero' ? { rotuloTieneNombre: true } : {}),
+                        }))
+                      }
                       className={`px-2 py-0.5 text-xs font-bold rounded-md border touch-active cursor-pointer ${
                         val
                           ? 'bg-sky-700 text-white border-sky-700'
@@ -187,7 +194,13 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setForm((p) => ({ ...p, [item.key]: false }))}
+                      onClick={() =>
+                        setForm((p) => ({
+                          ...p,
+                          [item.key]: false,
+                          ...(item.key === 'rotuloTieneEnfermero' ? { rotuloTieneNombre: false } : {}),
+                        }))
+                      }
                       className={`px-2 py-0.5 text-xs font-bold rounded-md border touch-active cursor-pointer ${
                         !val
                           ? 'bg-slate-700 text-white border-slate-700'
@@ -212,143 +225,191 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
       onSubmit={handleSubmit}
       className="px-3 pb-12 md:px-4 space-y-3.5 max-w-2xl mx-auto"
     >
-      {/* Pregunta Clave de Mínimos Clicks */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-100">
-            Cama {patient.cama} · Habitación {patient.habitacion}
-            {patient.historiaClinica && ` · HC: ${patient.historiaClinica}`}
-          </span>
-          <span className="text-[11px] text-slate-500 font-mono hidden sm:inline">
-            Atajos: [N] No · [S] Sí
-          </span>
-        </div>
+      {/* 0. ESTADO DE LA CAMA (Al comienzo del relevamiento) */}
+      <BedStatusSelector
+        value={form.motivoAusente || ''}
+        onChange={(status) =>
+          setForm((p) => ({
+            ...p,
+            motivoAusente: status,
+            tieneAcceso: status ? false : p.tieneAcceso,
+            tipoAccesoAlternativo: status ? 'ausente' : (p.tipoAccesoAlternativo === 'ausente' ? 'nada' : p.tipoAccesoAlternativo),
+          }))
+        }
+        cama={patient.cama}
+        habitacion={patient.habitacion}
+      />
 
-        <ToggleYesNo
-          label="¿El paciente tiene Acceso Periférico?"
-          description="Selecciona NO si no presenta vías periféricas activas"
-          value={form.tieneAcceso}
-          onChange={(val) =>
-            setForm((prev) => ({
-              ...prev,
-              tieneAcceso: val,
-              tipoAccesoAlternativo: !val ? 'nada' : '',
-            }))
-          }
-        />
-      </div>
-
-      {/* CASO 1: NO TIENE ACCESO PERIFÉRICO -> Opciones: Acceso Central, Percutáneo, Nada */}
-      {!form.tieneAcceso && (
-        <div className="space-y-3.5 animate-fade-in">
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-            <span className="block font-bold text-slate-800 text-sm flex items-center gap-1.5">
-              <Split className="w-4 h-4 text-sky-700" />
-              Selecciona situación o acceso alternativo:
-            </span>
-
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { id: 'acceso_central' as const, label: 'Acceso Central' },
-                { id: 'percutaneo' as const, label: 'Percutáneo' },
-                { id: 'nada' as const, label: 'Nada' },
-              ].map((opt) => (
-                <TouchChip
-                  key={opt.id}
-                  label={opt.label}
-                  selected={form.tipoAccesoAlternativo === opt.id}
-                  onClick={() =>
-                    setForm((p) => ({
-                      ...p,
-                      tipoAccesoAlternativo: opt.id,
-                    }))
-                  }
-                />
-              ))}
-            </div>
-
-            {/* Sub-opciones Acceso Central: Y/I, Y/D, S/I, S/D */}
-            {form.tipoAccesoAlternativo === 'acceso_central' && (
-              <div className="pt-3 border-t border-slate-100 space-y-2 animate-fade-in">
-                <span className="block text-xs font-bold text-slate-700">
-                  Ubicación del Acceso Central:
-                </span>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {[
-                    { id: 'Y/I' as const, label: 'Y/I', sub: 'Yugular Izq.' },
-                    { id: 'Y/D' as const, label: 'Y/D', sub: 'Yugular Der.' },
-                    { id: 'S/I' as const, label: 'S/I', sub: 'Subclavia Izq.' },
-                    { id: 'S/D' as const, label: 'S/D', sub: 'Subclavia Der.' },
-                  ].map((sub) => (
-                    <TouchChip
-                      key={sub.id}
-                      label={sub.label}
-                      subtitle={sub.sub}
-                      selected={form.accesoCentralUbicacion === sub.id}
-                      onClick={() => setForm((p) => ({ ...p, accesoCentralUbicacion: sub.id }))}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
+      {/* SI SE SELECCIONA UN ESTADO DE CAMA, LO DE ABAJO SE BLOQUEA Y SOLO APARECE EL BOTÓN DE GUARDAR */}
+      {form.motivoAusente ? (
+        <div className="space-y-3 animate-fade-in pt-1">
+          <div className="p-4 rounded-2xl bg-amber-50/90 border-2 border-amber-300 text-amber-950 space-y-2 text-center shadow-xs">
+            <h3 className="font-extrabold text-base md:text-lg">
+              Cama {patient.cama} — {form.motivoAusente === 'Libre' ? 'Cama Libre' : `Paciente en ${form.motivoAusente}`}
+            </h3>
+            <p className="text-xs text-amber-800 font-medium max-w-md mx-auto">
+              Relevamiento de vías bloqueado para esta cama ya que el paciente no se encuentra en ella.
+            </p>
           </div>
 
-          {/* Sub-opciones Percutáneo: Mostrar el módulo de Rótulo completo con SI/NO */}
-          {form.tipoAccesoAlternativo === 'percutaneo' &&
-            renderRotuloSection('Rótulo de Percutáneo')}
+          {/* Único botón visible: Guardar correspondiente */}
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full min-h-[58px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-base md:text-lg flex items-center justify-center gap-2 shadow-lg shadow-emerald-200 touch-active cursor-pointer transition-all"
+          >
+            <CheckCircle className="w-5 h-5" />
+            <span>
+              {isSubmitting
+                ? 'Guardando...'
+                : form.motivoAusente === 'Libre'
+                ? 'Guardar Cama Libre'
+                : `Guardar Paciente en ${form.motivoAusente}`}
+            </span>
+            <span className="text-xs bg-emerald-700/60 px-2 py-0.5 rounded font-mono hidden sm:inline">
+              [Enter]
+            </span>
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* Pregunta Clave de Mínimos Clicks */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-100">
+                Cama {patient.cama} · Habitación {patient.habitacion}
+                {patient.historiaClinica && ` · HC: ${patient.historiaClinica}`}
+              </span>
+              <span className="text-[11px] text-slate-500 font-mono hidden sm:inline">
+                Atajos: [N] No · [S] Sí
+              </span>
+            </div>
 
-          {/* Observaciones libres */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-1.5">
-            <label className="text-[11px] font-bold text-slate-600 uppercase block">
-              Observaciones / Notas adicionales (opcional)
-            </label>
-            <input
-              type="text"
-              value={form.observaciones}
-              onChange={(e) => setForm((p) => ({ ...p, observaciones: e.target.value }))}
-              placeholder="Ej: Acceso central normofuncional, retiro programado, etc..."
-              className="w-full min-h-[44px] px-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-slate-50 focus:bg-white"
+            <ToggleYesNo
+              label="¿El paciente tiene Acceso Periférico?"
+              description="Selecciona NO si no presenta vías periféricas activas"
+              value={form.tieneAcceso}
+              onChange={(val) =>
+                setForm((prev) => ({
+                  ...prev,
+                  tieneAcceso: val,
+                  tipoAccesoAlternativo: !val ? 'nada' : '',
+                }))
+              }
             />
           </div>
 
-          {/* Botón de Guardar en caso de NO tener acceso periférico */}
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full min-h-[56px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-base md:text-lg flex items-center justify-center gap-2 shadow-lg shadow-emerald-200 touch-active cursor-pointer transition-all"
-            >
-              <CheckCircle className="w-5 h-5" />
-              <span>
-                {isSubmitting
-                  ? 'Guardando...'
-                  : form.tipoAccesoAlternativo === 'acceso_central'
-                  ? 'Guardar Paciente (Con Acceso Central)'
-                  : form.tipoAccesoAlternativo === 'percutaneo'
-                  ? 'Guardar Paciente (Con Percutáneo)'
-                  : 'Guardar Paciente (Sin Acceso)'}
-              </span>
-              <span className="text-xs bg-emerald-700/60 px-2 py-0.5 rounded font-mono hidden sm:inline">
-                [Enter]
-              </span>
-            </button>
-          </div>
+          {/* CASO 1: NO TIENE ACCESO PERIFÉRICO -> Opciones: Acceso Central, Percutáneo, Nada */}
+          {!form.tieneAcceso && (
+            <div className="space-y-3.5 animate-fade-in">
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+                <span className="block font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                  <Split className="w-4 h-4 text-sky-700" />
+                  Selecciona situación o acceso alternativo:
+                </span>
 
-          {/* Transición a Ronda 2 si ya terminó */}
-          {onSwitchToUpp && (
-            <div className="pt-3 border-t border-slate-200 text-center">
-              <button
-                type="button"
-                onClick={onSwitchToUpp}
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-800 bg-sky-50 hover:bg-sky-100 px-3.5 py-2 rounded-xl border border-sky-200 touch-active cursor-pointer"
-              >
-                <span>¿Terminaste todas las vías? Iniciar Ronda 2: UPP</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'acceso_central' as const, label: 'Acceso Central' },
+                    { id: 'percutaneo' as const, label: 'Percutáneo' },
+                    { id: 'nada' as const, label: 'Nada (Sin Vía)' },
+                  ].map((opt) => (
+                    <TouchChip
+                      key={opt.id}
+                      label={opt.label}
+                      selected={form.tipoAccesoAlternativo === opt.id}
+                      onClick={() =>
+                        setForm((p) => ({
+                          ...p,
+                          tipoAccesoAlternativo: opt.id,
+                        }))
+                      }
+                    />
+                  ))}
+                </div>
+
+                {/* Sub-opciones Acceso Central: Y/I, Y/D, S/I, S/D */}
+                {form.tipoAccesoAlternativo === 'acceso_central' && (
+                  <div className="pt-3 border-t border-slate-100 space-y-2 animate-fade-in">
+                    <span className="block text-xs font-bold text-slate-700">
+                      Ubicación del Acceso Central:
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {[
+                        { id: 'Y/I' as const, label: 'Y/I', sub: 'Yugular Izq.' },
+                        { id: 'Y/D' as const, label: 'Y/D', sub: 'Yugular Der.' },
+                        { id: 'S/I' as const, label: 'S/I', sub: 'Subclavia Izq.' },
+                        { id: 'S/D' as const, label: 'S/D', sub: 'Subclavia Der.' },
+                      ].map((sub) => (
+                        <TouchChip
+                          key={sub.id}
+                          label={sub.label}
+                          subtitle={sub.sub}
+                          selected={form.accesoCentralUbicacion === sub.id}
+                          onClick={() => setForm((p) => ({ ...p, accesoCentralUbicacion: sub.id }))}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Sub-opciones Percutáneo: Mostrar el módulo de Rótulo completo con SI/NO */}
+              {form.tipoAccesoAlternativo === 'percutaneo' &&
+                renderRotuloSection('Rótulo de Percutáneo')}
+
+              {/* Observaciones libres */}
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-1.5">
+                <label className="text-[11px] font-bold text-slate-600 uppercase block">
+                  Observaciones / Notas adicionales (opcional)
+                </label>
+                <input
+                  type="text"
+                  value={form.observaciones}
+                  onChange={(e) => setForm((p) => ({ ...p, observaciones: e.target.value }))}
+                  placeholder="Ej: Acceso central normofuncional, retiro programado, etc..."
+                  className="w-full min-h-[44px] px-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-slate-50 focus:bg-white"
+                />
+              </div>
+
+              {/* Botón de Guardar en caso de NO tener acceso periférico */}
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full min-h-[56px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-base md:text-lg flex items-center justify-center gap-2 shadow-lg shadow-emerald-200 touch-active cursor-pointer transition-all"
+                >
+                  <CheckCircle className="w-5 h-5" />
+                  <span>
+                    {isSubmitting
+                      ? 'Guardando...'
+                      : form.tipoAccesoAlternativo === 'acceso_central'
+                      ? 'Guardar Paciente (Con Acceso Central)'
+                      : form.tipoAccesoAlternativo === 'percutaneo'
+                      ? 'Guardar Paciente (Con Percutáneo)'
+                      : 'Guardar Paciente (Sin Acceso)'}
+                  </span>
+                  <span className="text-xs bg-emerald-700/60 px-2 py-0.5 rounded font-mono hidden sm:inline">
+                    [Enter]
+                  </span>
+                </button>
+              </div>
+
+              {/* Transición a Ronda 2 si ya terminó */}
+              {onSwitchToUpp && (
+                <div className="pt-3 border-t border-slate-200 text-center">
+                  <button
+                    type="button"
+                    onClick={onSwitchToUpp}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-800 bg-sky-50 hover:bg-sky-100 px-3.5 py-2 rounded-xl border border-sky-200 touch-active cursor-pointer"
+                  >
+                    <span>¿Terminaste todas las vías? Iniciar Ronda 2: UPP</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
           )}
-        </div>
-      )}
 
       {/* CASO 2: SÍ TIENE ACCESO PERIFÉRICO */}
       {form.tieneAcceso && (
@@ -621,6 +682,8 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
             </button>
           </div>
         </div>
+      )}
+        </>
       )}
     </form>
   );

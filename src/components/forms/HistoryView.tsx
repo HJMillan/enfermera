@@ -202,6 +202,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                             isAcceso
                               ? dataAcceso?.tieneAcceso
                                 ? 'bg-sky-100 text-sky-800'
+                                : dataAcceso?.tipoAccesoAlternativo === 'ausente' || dataAcceso?.motivoAusente
+                                ? 'bg-amber-100 text-amber-800 border border-amber-200'
                                 : dataAcceso?.tipoAccesoAlternativo === 'acceso_central'
                                 ? 'bg-indigo-100 text-indigo-800'
                                 : dataAcceso?.tipoAccesoAlternativo === 'percutaneo'
@@ -209,12 +211,18 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                                 : 'bg-slate-100 text-slate-600'
                               : dataUpp?.tieneUpp
                               ? 'bg-rose-100 text-rose-800'
+                              : dataUpp?.motivoAusente
+                              ? 'bg-amber-100 text-amber-800 border border-amber-200'
                               : 'bg-slate-100 text-slate-600'
                           }`}
                         >
                           {isAcceso
                             ? dataAcceso?.tieneAcceso
                               ? 'Con Vía'
+                              : dataAcceso?.motivoAusente
+                              ? dataAcceso.motivoAusente
+                              : dataAcceso?.tipoAccesoAlternativo === 'ausente'
+                              ? 'Ausente'
                               : dataAcceso?.tipoAccesoAlternativo === 'acceso_central'
                               ? 'Acceso Central'
                               : dataAcceso?.tipoAccesoAlternativo === 'percutaneo'
@@ -222,6 +230,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                               : 'Sin Vía'
                             : dataUpp?.tieneUpp
                             ? 'Con UPP'
+                            : dataUpp?.motivoAusente
+                            ? dataUpp.motivoAusente
                             : 'Piel Íntegra'}
                         </span>
                       </div>
@@ -324,12 +334,14 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                     {isAcceso && dataAcceso && !dataAcceso.tieneAcceso && (
                       <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/60 text-slate-700">
                         <div>
-                          <span className="font-bold text-slate-600 block">Acceso Alternativo:</span>
+                          <span className="font-bold text-slate-600 block">Situación / Acceso:</span>
                           <span>
                             {dataAcceso.tipoAccesoAlternativo === 'acceso_central'
                               ? `Acceso Central (${dataAcceso.accesoCentralUbicacion || 'S/D'})`
                               : dataAcceso.tipoAccesoAlternativo === 'percutaneo'
                               ? `Percutáneo (Rótulo: ${dataAcceso.tieneRotulo ? 'SÍ' : 'NO'})`
+                              : dataAcceso.motivoAusente || dataAcceso.tipoAccesoAlternativo === 'ausente'
+                              ? `Ausente / Cama Libre (${dataAcceso.motivoAusente || 'Libre'})`
                               : 'Ninguno / Nada'}
                           </span>
                         </div>

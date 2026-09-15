@@ -13,6 +13,7 @@ import {
 import type { BasePatientData, UppForm as UppFormType } from '../../types/form';
 import { ToggleYesNo } from '../common/ToggleYesNo';
 import { TouchChip } from '../common/TouchChip';
+import { BedStatusSelector } from '../common/BedStatusSelector';
 import { getCurrentDateISO } from '../../utils/dateUtils';
 
 interface UppFormProps {
@@ -42,6 +43,7 @@ const COMMON_TREATMENTS = [
 
 const INITIAL_UPP_STATE = {
   tieneUpp: false,
+  motivoAusente: '',
   fechaIngreso: getCurrentDateISO(),
   pasoAreaCerrada: false,
   areaCerradaCual: '',
@@ -166,60 +168,107 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
       onSubmit={handleSubmit}
       className="px-3 pb-12 md:px-4 space-y-3.5 max-w-2xl mx-auto"
     >
-      {/* Pregunta Clave de Mínimos Clicks */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-100">
-            Cama {patient.cama} · Habitación {patient.habitacion}
-            {patient.historiaClinica && ` · HC: ${patient.historiaClinica}`}
-          </span>
-          <span className="text-[11px] text-slate-500 font-mono hidden sm:inline">
-            Atajos: [N] No · [S] Sí
-          </span>
-        </div>
+      {/* 0. ESTADO DE LA CAMA (Al comienzo del relevamiento) */}
+      <BedStatusSelector
+        value={form.motivoAusente || ''}
+        onChange={(status) =>
+          setForm((p) => ({
+            ...p,
+            motivoAusente: status,
+            tieneUpp: status ? false : p.tieneUpp,
+          }))
+        }
+        cama={patient.cama}
+        habitacion={patient.habitacion}
+      />
 
-        <ToggleYesNo
-          label="¿El paciente presenta Úlcera por Presión (UPP)?"
-          description="Selecciona NO si la piel se encuentra íntegra sin lesiones"
-          value={form.tieneUpp}
-          onChange={(val) => setForm((prev) => ({ ...prev, tieneUpp: val }))}
-        />
-      </div>
+      {/* SI SE SELECCIONA UN ESTADO DE CAMA, LO DE ABAJO SE BLOQUEA Y SOLO APARECE EL BOTÓN DE GUARDAR */}
+      {form.motivoAusente ? (
+        <div className="space-y-3 animate-fade-in pt-1">
+          <div className="p-4 rounded-2xl bg-amber-50/90 border-2 border-amber-300 text-amber-950 space-y-2 text-center shadow-xs">
+            <h3 className="font-extrabold text-base md:text-lg">
+              Cama {patient.cama} — {form.motivoAusente === 'Libre' ? 'Cama Libre' : `Paciente en ${form.motivoAusente}`}
+            </h3>
+            <p className="text-xs text-amber-800 font-medium max-w-md mx-auto">
+              Relevamiento de UPP bloqueado para esta cama ya que el paciente no se encuentra en ella.
+            </p>
+          </div>
 
-      {/* CASO 1: NO TIENE UPP -> Botón Inmediato (1 toque o Enter) */}
-      {!form.tieneUpp && (
-        <div className="pt-2 animate-fade-in space-y-3">
+          {/* Único botón visible: Guardar correspondiente */}
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full min-h-[56px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-base md:text-lg flex items-center justify-center gap-2 shadow-lg shadow-emerald-200 touch-active cursor-pointer transition-all"
+            className="w-full min-h-[58px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-base md:text-lg flex items-center justify-center gap-2 shadow-lg shadow-emerald-200 touch-active cursor-pointer transition-all"
           >
             <CheckCircle className="w-5 h-5" />
-            <span>{isSubmitting ? 'Guardando...' : 'Guardar Paciente (Sin UPP / Piel Íntegra)'}</span>
+            <span>
+              {isSubmitting
+                ? 'Guardando...'
+                : form.motivoAusente === 'Libre'
+                ? 'Guardar Cama Libre'
+                : `Guardar Paciente en ${form.motivoAusente}`}
+            </span>
             <span className="text-xs bg-emerald-700/60 px-2 py-0.5 rounded font-mono hidden sm:inline">
               [Enter]
             </span>
           </button>
+        </div>
+      ) : (
+        <>
+          {/* Pregunta Clave de Mínimos Clicks */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-100">
+                Cama {patient.cama} · Habitación {patient.habitacion}
+                {patient.historiaClinica && ` · HC: ${patient.historiaClinica}`}
+              </span>
+              <span className="text-[11px] text-slate-500 font-mono hidden sm:inline">
+                Atajos: [N] No · [S] Sí
+              </span>
+            </div>
 
-          <p className="text-center text-xs text-slate-600">
-            Se registrará como NO presenta úlceras por presión para esta cama.
-          </p>
+            <ToggleYesNo
+              label="¿El paciente presenta Úlcera por Presión (UPP)?"
+              description="Selecciona NO si la piel se encuentra íntegra sin lesiones"
+              value={form.tieneUpp}
+              onChange={(val) => setForm((prev) => ({ ...prev, tieneUpp: val }))}
+            />
+          </div>
 
-          {/* Botón rápido para finalizar turno */}
-          {onOpenShiftClose && (
-            <div className="pt-4 border-t border-slate-200 text-center">
+          {/* CASO 1: NO TIENE UPP -> Botón Inmediato (1 toque o Enter) */}
+          {!form.tieneUpp && (
+            <div className="pt-2 animate-fade-in space-y-3">
               <button
-                type="button"
-                onClick={onOpenShiftClose}
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-800 bg-slate-100 hover:bg-slate-200 px-3.5 py-2 rounded-xl border border-slate-300 touch-active cursor-pointer"
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full min-h-[56px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-base md:text-lg flex items-center justify-center gap-2 shadow-lg shadow-emerald-200 touch-active cursor-pointer transition-all"
               >
-                <Award className="w-4 h-4 text-sky-700" />
-                <span>¿Finalizaste la ronda de UPP? Ver Cierre de Turno 8-16hs</span>
+                <CheckCircle className="w-5 h-5" />
+                <span>{isSubmitting ? 'Guardando...' : 'Guardar Paciente (Sin UPP / Piel Íntegra)'}</span>
+                <span className="text-xs bg-emerald-700/60 px-2 py-0.5 rounded font-mono hidden sm:inline">
+                  [Enter]
+                </span>
               </button>
+
+              <p className="text-center text-xs text-slate-600">
+                Se registrará como NO presenta úlceras por presión para esta cama.
+              </p>
+
+              {/* Botón rápido para finalizar turno */}
+              {onOpenShiftClose && (
+                <div className="pt-4 border-t border-slate-200 text-center">
+                  <button
+                    type="button"
+                    onClick={onOpenShiftClose}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-800 bg-slate-100 hover:bg-slate-200 px-3.5 py-2 rounded-xl border border-slate-300 touch-active cursor-pointer"
+                  >
+                    <Award className="w-4 h-4 text-sky-700" />
+                    <span>¿Finalizaste la ronda de UPP? Ver Cierre de Turno 8-16hs</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
-        </div>
-      )}
 
       {/* CASO 2: SÍ TIENE UPP -> Formulario completo desplegado */}
       {form.tieneUpp && (
@@ -663,6 +712,8 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
             </button>
           </div>
         </div>
+      )}
+        </>
       )}
     </form>
   );

@@ -58,7 +58,7 @@ export function mapAccesoPerifericoToRow(data: AccesoPerifericoForm): (string | 
     data.cantidadAuxiliares ?? '',                                                  // G
     tiene ? 'SI' : '',                                                              // H
     !tiene ? 'NO' : '',                                                             // I
-    !tiene ? (data.tipoAccesoAlternativo || 'nada') : '',                          // J
+    !tiene ? (data.tipoAccesoAlternativo === 'ausente' || data.motivoAusente ? (data.motivoAusente || 'Ausente') : (data.tipoAccesoAlternativo || 'nada')) : '', // J
     !tiene && data.tipoAccesoAlternativo === 'acceso_central' ? (data.accesoCentralUbicacion || '') : '', // K
     tiene ? (data.cuantas ?? 1) : 0,                                                // L
     tiene && data.ubicacionMSD ? 'SI' : '',                                         // M
@@ -67,9 +67,9 @@ export function mapAccesoPerifericoToRow(data: AccesoPerifericoForm): (string | 
     tiene && data.ubicacionMID ? 'SI' : '',                                         // P
     evaluaRotulo ? (data.tieneRotulo ? 'SI' : 'NO') : '',                           // Q
     evaluaRotulo && data.tieneRotulo ? (data.rotuloTieneFecha ? 'SI' : 'NO') : '',   // R
-    evaluaRotulo && data.tieneRotulo ? (data.rotuloTieneNombre ? 'SI' : 'NO') : '',  // S
+    evaluaRotulo && data.tieneRotulo ? ((data.rotuloTieneEnfermero ?? data.rotuloTieneNombre) ? 'SI' : 'NO') : '',  // S (Nombre / Enfermero)
     evaluaRotulo && data.tieneRotulo ? (data.rotuloTieneLegajo ? 'SI' : 'NO') : '',  // T
-    evaluaRotulo && data.tieneRotulo ? (data.rotuloTieneEnfermero ? 'SI' : 'NO') : '', // U
+    evaluaRotulo && data.tieneRotulo ? ((data.rotuloTieneEnfermero ?? data.rotuloTieneNombre) ? 'SI' : 'NO') : '', // U (Enfermero)
     evaluaRotulo && data.tieneRotulo ? (data.rotuloTieneTurno ? 'SI' : 'NO') : '',   // V
     evaluaRotulo && data.tieneRotulo ? (data.rotuloTieneABB ? 'SI' : 'NO') : '',     // W
     tiene ? (data.visibilidad ? 'SI' : '') : '',                                    // X
@@ -87,7 +87,7 @@ export function mapAccesoPerifericoToRow(data: AccesoPerifericoForm): (string | 
     tiene && data.caracteristicasEritematoso ? 'SI' : '',                           // AJ
     tiene && data.caracteristicasRetorno ? 'SI' : '',                               // AK
     tiene ? (data.infusionType || '') : '',                                         // AL
-    data.observaciones || ''                                                        // AM
+    data.motivoAusente ? (data.observaciones ? `${data.motivoAusente} - ${data.observaciones}` : data.motivoAusente) : (data.observaciones || '') // AM
   ];
 }
 
@@ -173,6 +173,6 @@ export function mapUppToRow(data: UppForm): (string | number | boolean)[] {
     tiene && (data.nutricionEnteralBg || data.nutricion === 'enteral BG') ? 'SI' : '', // AG
     tiene ? (data.colchonAntiEscaras ? 'SI' : '') : '',                             // AH
     tiene ? (!data.colchonAntiEscaras ? 'NO' : '') : '',                            // AI
-    tiene ? (data.observacionesColchon || '') : ''                                  // AJ
+    !tiene && data.motivoAusente ? `Paciente ausente / Cama libre: ${data.motivoAusente}` : (data.observacionesColchon || '') // AJ
   ];
 }
