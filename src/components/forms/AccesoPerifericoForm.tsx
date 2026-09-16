@@ -124,10 +124,10 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
 
   // Render del componente del Rótulo (reutilizado para Acceso Periférico y Percutáneo)
   const renderRotuloSection = (titulo = 'Rótulo de Colocación') => (
-    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+    <div className="bg-white p-4 rounded-[var(--radius-md)] border border-slate-200/80 shadow-[var(--shadow-rest)] transition-[transform,box-shadow,border-color] duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-hover)] space-y-3">
+      <div className="group flex items-center justify-between border-b border-slate-100 pb-2">
         <div className="flex items-center gap-1.5">
-          <Tag className="w-4 h-4 text-sky-700" />
+          <Tag className="w-4 h-4 text-sky-700 transition-transform duration-[var(--duration-fast)] ease-[var(--ease-standard)] group-hover:scale-110" />
           <span className="font-bold text-slate-900 text-sm">{titulo}</span>
         </div>
 
@@ -135,7 +135,7 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
           <button
             type="button"
             onClick={handleAllRotuloYes}
-            className="flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg touch-active cursor-pointer transition-all"
+            className="flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-[var(--radius-sm)] cursor-pointer transition-[transform,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98]"
             title="Marcar todos los ítems del rótulo en SÍ"
           >
             <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />
@@ -243,7 +243,7 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
       {/* SI SE SELECCIONA UN ESTADO DE CAMA, LO DE ABAJO SE BLOQUEA Y SOLO APARECE EL BOTÓN DE GUARDAR */}
       {form.motivoAusente ? (
         <div className="space-y-3 animate-fade-in pt-1">
-          <div className="p-4 rounded-2xl bg-amber-50/90 border-2 border-amber-300 text-amber-950 space-y-2 text-center shadow-xs">
+          <div className="p-4 rounded-[var(--radius-md)] bg-amber-50/95 border-2 border-amber-300 text-amber-950 space-y-2 text-center shadow-[var(--shadow-rest)] transition-[box-shadow] duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-hover)]">
             <h3 className="font-extrabold text-base md:text-lg">
               Cama {patient.cama} — {form.motivoAusente === 'Libre' ? 'Cama Libre' : `Paciente en ${form.motivoAusente}`}
             </h3>
@@ -256,7 +256,7 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full min-h-[58px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-base md:text-lg flex items-center justify-center gap-2 shadow-lg shadow-emerald-200 touch-active cursor-pointer transition-all"
+            className="w-full min-h-[58px] rounded-[var(--radius-md)] bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-base md:text-lg flex items-center justify-center gap-2 shadow-[var(--shadow-hover)] cursor-pointer transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] hover:-translate-y-0.5"
           >
             <CheckCircle className="w-5 h-5" />
             <span>
@@ -266,7 +266,7 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
                 ? 'Guardar Cama Libre'
                 : `Guardar Paciente en ${form.motivoAusente}`}
             </span>
-            <span className="text-xs bg-emerald-700/60 px-2 py-0.5 rounded font-mono hidden sm:inline">
+            <span className="text-xs bg-emerald-700/60 px-2 py-0.5 rounded-[var(--radius-sm)] font-mono hidden sm:inline">
               [Enter]
             </span>
           </button>
@@ -274,9 +274,9 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
       ) : (
         <>
           {/* Pregunta Clave de Mínimos Clicks */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+          <div className="bg-white p-4 rounded-[var(--radius-md)] border border-slate-200/80 shadow-[var(--shadow-rest)] transition-[transform,box-shadow,border-color] duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-hover)]">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-100">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-sky-700 bg-sky-50 px-2 py-0.5 rounded-[var(--radius-sm)] border border-sky-100">
                 Cama {patient.cama} · Habitación {patient.habitacion}
                 {patient.historiaClinica && ` · HC: ${patient.historiaClinica}`}
               </span>
@@ -302,9 +302,9 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
           {/* CASO 1: NO TIENE ACCESO PERIFÉRICO -> Opciones: Acceso Central, Percutáneo, Nada */}
           {!form.tieneAcceso && (
             <div className="space-y-3.5 animate-fade-in">
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-                <span className="block font-bold text-slate-800 text-sm flex items-center gap-1.5">
-                  <Split className="w-4 h-4 text-sky-700" />
+              <div className="bg-white p-4 rounded-[var(--radius-md)] border border-slate-200/80 shadow-[var(--shadow-rest)] transition-[transform,box-shadow,border-color] duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-hover)] space-y-3">
+                <span className="group font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                  <Split className="w-4 h-4 text-sky-700 transition-transform duration-[var(--duration-fast)] ease-[var(--ease-standard)] group-hover:scale-110" />
                   Selecciona situación o acceso alternativo:
                 </span>
 
@@ -359,7 +359,7 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
                 renderRotuloSection('Rótulo de Percutáneo')}
 
               {/* Observaciones libres */}
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-1.5">
+              <div className="bg-white p-4 rounded-[var(--radius-md)] border border-slate-200/80 shadow-[var(--shadow-rest)] transition-[transform,box-shadow,border-color] duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-hover)] space-y-1.5">
                 <label className="text-[11px] font-bold text-slate-600 uppercase block">
                   Observaciones / Notas adicionales (opcional)
                 </label>
@@ -368,7 +368,7 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
                   value={form.observaciones}
                   onChange={(e) => setForm((p) => ({ ...p, observaciones: e.target.value }))}
                   placeholder="Ej: Acceso central normofuncional, retiro programado, etc..."
-                  className="w-full min-h-[44px] px-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-slate-50 focus:bg-white"
+                  className="w-full min-h-[44px] px-3 rounded-[var(--radius-sm)] border border-slate-200 text-xs font-semibold text-slate-800 bg-slate-50 focus:bg-white transition-[background-color,border-color,box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-smooth)]"
                 />
               </div>
 
@@ -377,7 +377,7 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full min-h-[56px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-base md:text-lg flex items-center justify-center gap-2 shadow-lg shadow-emerald-200 touch-active cursor-pointer transition-all"
+                  className="w-full min-h-[56px] rounded-[var(--radius-md)] bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-base md:text-lg flex items-center justify-center gap-2 shadow-[var(--shadow-hover)] cursor-pointer transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] hover:-translate-y-0.5"
                 >
                   <CheckCircle className="w-5 h-5" />
                   <span>
@@ -389,7 +389,7 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
                       ? 'Guardar Paciente (Con Percutáneo)'
                       : 'Guardar Paciente (Sin Acceso)'}
                   </span>
-                  <span className="text-xs bg-emerald-700/60 px-2 py-0.5 rounded font-mono hidden sm:inline">
+                  <span className="text-xs bg-emerald-700/60 px-2 py-0.5 rounded-[var(--radius-sm)] font-mono hidden sm:inline">
                     [Enter]
                   </span>
                 </button>
@@ -401,7 +401,7 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
                   <button
                     type="button"
                     onClick={onSwitchToUpp}
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-800 bg-sky-50 hover:bg-sky-100 px-3.5 py-2 rounded-xl border border-sky-200 touch-active cursor-pointer"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-800 bg-sky-50 hover:bg-sky-100 px-3.5 py-2 rounded-[var(--radius-sm)] border border-sky-200 transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] cursor-pointer"
                   >
                     <span>¿Terminaste todas las vías? Iniciar Ronda 2: UPP</span>
                     <ArrowRight className="w-3.5 h-3.5" />
@@ -415,16 +415,16 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
       {form.tieneAcceso && (
         <div className="space-y-3.5 animate-fade-in">
           {/* 1. Cantidad y Ubicación (Multi-selección) */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+          <div className="bg-white p-4 rounded-[var(--radius-md)] border border-slate-200/80 shadow-[var(--shadow-rest)] transition-[transform,box-shadow,border-color] duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-hover)] space-y-3">
             <div className="flex items-center justify-between">
               <span className="font-bold text-slate-800 text-sm">Cantidad de Vías</span>
-              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-1">
+              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-[var(--radius-sm)] p-1">
                 <button
                   type="button"
                   onClick={() =>
                     setForm((p) => ({ ...p, cuantas: Math.max(1, (p.cuantas || 1) - 1) }))
                   }
-                  className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-700 flex items-center justify-center touch-active"
+                  className="w-8 h-8 rounded-[calc(var(--radius-sm)-4px)] bg-white border border-slate-200 text-slate-700 flex items-center justify-center transition-[transform,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer"
                 >
                   <Minus className="w-3.5 h-3.5" />
                 </button>
@@ -434,7 +434,7 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
                 <button
                   type="button"
                   onClick={() => setForm((p) => ({ ...p, cuantas: (p.cuantas || 1) + 1 }))}
-                  className="w-8 h-8 rounded-lg bg-sky-600 text-white flex items-center justify-center touch-active"
+                  className="w-8 h-8 rounded-[calc(var(--radius-sm)-4px)] bg-sky-600 text-white flex items-center justify-center transition-[transform,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                 </button>
@@ -472,7 +472,7 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
           {renderRotuloSection('Rótulo de Colocación')}
 
           {/* 3. Visibilidad */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+          <div className="bg-white p-4 rounded-[var(--radius-md)] border border-slate-200/80 shadow-[var(--shadow-rest)] transition-[transform,box-shadow,border-color] duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-hover)]">
             <ToggleYesNo
               label="Visibilidad del Sitio de Punción"
               description="¿El punto de punción es visible e inspeccionable?"
@@ -482,7 +482,7 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
           </div>
 
           {/* 4. Fijación, Sub-tipos de Cinta y Adherencia */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+          <div className="bg-white p-4 rounded-[var(--radius-md)] border border-slate-200/80 shadow-[var(--shadow-rest)] transition-[transform,box-shadow,border-color] duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-hover)] space-y-3">
             <div>
               <span className="block font-bold text-slate-800 text-sm mb-1.5">
                 Material de Fijación
@@ -534,10 +534,10 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
                       key={cTipo}
                       type="button"
                       onClick={() => setForm((p) => ({ ...p, fijacionCintaTipo: cTipo }))}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-all touch-active cursor-pointer ${
+                      className={`px-2.5 py-1.5 rounded-[var(--radius-sm)] text-xs font-bold border transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer ${
                         form.fijacionCintaTipo === cTipo
-                          ? 'bg-sky-700 text-white border-sky-700 shadow-xs'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                          ? 'bg-sky-700 text-white border-sky-700 shadow-[var(--shadow-rest)] hover:scale-[1.015]'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
                       }`}
                     >
                       {cTipo.charAt(0).toUpperCase() + cTipo.slice(1)}
@@ -566,7 +566,7 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
           </div>
 
           {/* 5. Lúmenes y Características Clínicas */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+          <div className="bg-white p-4 rounded-[var(--radius-md)] border border-slate-200/80 shadow-[var(--shadow-rest)] transition-[transform,box-shadow,border-color] duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-hover)] space-y-3">
             <div>
               <span className="block font-bold text-slate-800 text-sm mb-1.5">
                 Lúmenes / Conectores
@@ -593,8 +593,8 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
             </div>
 
             <div>
-              <span className="block font-bold text-slate-800 text-sm mb-1.5 flex items-center gap-1">
-                <ShieldAlert className="w-4 h-4 text-amber-500" />
+              <span className="group font-bold text-slate-800 text-sm mb-1.5 flex items-center gap-1">
+                <ShieldAlert className="w-4 h-4 text-amber-500 transition-transform duration-[var(--duration-fast)] ease-[var(--ease-standard)] group-hover:scale-110" />
                 Características del Acceso
               </span>
               <div className="grid grid-cols-3 gap-2">
@@ -636,9 +636,9 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
           </div>
 
           {/* 6. Tipo de Infusión (Solo continua o intermitente) */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-2">
-            <span className="block font-bold text-slate-800 text-sm flex items-center gap-1.5">
-              <Activity className="w-4 h-4 text-sky-700" />
+          <div className="bg-white p-4 rounded-[var(--radius-md)] border border-slate-200/80 shadow-[var(--shadow-rest)] transition-[transform,box-shadow,border-color] duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-hover)] space-y-2">
+            <span className="group font-bold text-slate-800 text-sm flex items-center gap-1.5">
+              <Activity className="w-4 h-4 text-sky-700 transition-transform duration-[var(--duration-fast)] ease-[var(--ease-standard)] group-hover:scale-110" />
               Tipo de Infusión
             </span>
             <div className="grid grid-cols-2 gap-2">
@@ -654,7 +654,7 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
           </div>
 
           {/* 7. Observaciones libres */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-1.5">
+          <div className="bg-white p-4 rounded-[var(--radius-md)] border border-slate-200/80 shadow-[var(--shadow-rest)] transition-[transform,box-shadow,border-color] duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-hover)] space-y-1.5">
             <label className="text-[11px] font-bold text-slate-600 uppercase block">
               Observaciones / Notas adicionales (opcional)
             </label>
@@ -663,7 +663,7 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
               value={form.observaciones}
               onChange={(e) => setForm((p) => ({ ...p, observaciones: e.target.value }))}
               placeholder="Ej: Calibre 20G en flexura, vía difícil, próximo cambio, etc..."
-              className="w-full min-h-[44px] px-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-slate-50 focus:bg-white"
+              className="w-full min-h-[44px] px-3 rounded-[var(--radius-sm)] border border-slate-200 text-xs font-semibold text-slate-800 bg-slate-50 focus:bg-white transition-[background-color,border-color,box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-smooth)]"
             />
           </div>
 
@@ -672,11 +672,11 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full min-h-[56px] rounded-2xl bg-sky-700 hover:bg-sky-800 text-white font-extrabold text-base md:text-lg flex items-center justify-center gap-2 shadow-lg shadow-sky-200 touch-active cursor-pointer transition-all"
+              className="w-full min-h-[56px] rounded-[var(--radius-md)] bg-sky-700 hover:bg-sky-800 text-white font-extrabold text-base md:text-lg flex items-center justify-center gap-2 shadow-[var(--shadow-hover)] cursor-pointer transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] hover:-translate-y-0.5"
             >
               <Save className="w-5 h-5" />
               <span>{isSubmitting ? 'Guardando...' : 'Guardar Registro de Vía'}</span>
-              <span className="text-xs bg-sky-800/60 px-2 py-0.5 rounded font-mono hidden sm:inline">
+              <span className="text-xs bg-sky-800/60 px-2 py-0.5 rounded-[var(--radius-sm)] font-mono hidden sm:inline">
                 [Enter]
               </span>
             </button>

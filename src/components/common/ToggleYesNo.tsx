@@ -30,26 +30,26 @@ export const ToggleYesNo: React.FC<ToggleYesNoProps> = ({
         <button
           type="button"
           onClick={() => onChange(true)}
-          className={`min-h-[50px] rounded-xl font-bold text-base flex items-center justify-center gap-2 border-2 transition-all duration-150 touch-active cursor-pointer ${
+          className={`group min-h-[50px] rounded-[var(--radius-sm)] font-bold text-base flex items-center justify-center gap-2 border-2 transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer select-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1 ${
             value === true
-              ? 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-200 ring-2 ring-emerald-300 ring-offset-1'
-              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+              ? 'bg-emerald-600 border-emerald-600 text-white shadow-[var(--shadow-hover)] ring-2 ring-emerald-300/70 hover:scale-[1.015] hover:-translate-y-0.5'
+              : 'bg-white border-slate-200 text-slate-700 shadow-[var(--shadow-rest)] hover:bg-slate-50 hover:border-slate-300 hover:shadow-[var(--shadow-hover)] hover:-translate-y-0.5'
           }`}
         >
-          <Check className={`w-5 h-5 ${value === true ? 'text-white stroke-[3]' : 'text-slate-600'}`} />
+          <Check className={`w-5 h-5 transition-transform duration-[var(--duration-fast)] ease-[var(--ease-standard)] group-hover:scale-110 ${value === true ? 'text-white stroke-[3]' : 'text-slate-600'}`} />
           <span>{yesText}</span>
         </button>
 
         <button
           type="button"
           onClick={() => onChange(false)}
-          className={`min-h-[50px] rounded-xl font-bold text-base flex items-center justify-center gap-2 border-2 transition-all duration-150 touch-active cursor-pointer ${
+          className={`group min-h-[50px] rounded-[var(--radius-sm)] font-bold text-base flex items-center justify-center gap-2 border-2 transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer select-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-1 ${
             value === false
-              ? 'bg-rose-600 border-rose-600 text-white shadow-md shadow-rose-200 ring-2 ring-rose-300 ring-offset-1'
-              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+              ? 'bg-rose-600 border-rose-600 text-white shadow-[var(--shadow-hover)] ring-2 ring-rose-300/70 hover:scale-[1.015] hover:-translate-y-0.5'
+              : 'bg-white border-slate-200 text-slate-700 shadow-[var(--shadow-rest)] hover:bg-slate-50 hover:border-slate-300 hover:shadow-[var(--shadow-hover)] hover:-translate-y-0.5'
           }`}
         >
-          <X className={`w-5 h-5 ${value === false ? 'text-white stroke-[3]' : 'text-slate-600'}`} />
+          <X className={`w-5 h-5 transition-transform duration-[var(--duration-fast)] ease-[var(--ease-standard)] group-hover:scale-110 ${value === false ? 'text-white stroke-[3]' : 'text-slate-600'}`} />
           <span>{noText}</span>
         </button>
       </div>

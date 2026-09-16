@@ -206,9 +206,9 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col antialiased selection:bg-sky-200">
       {/* Barra de Navegación Principal Superior */}
-      <header className="bg-white border-b border-slate-200 px-3 py-2.5 md:px-6 flex items-center justify-between shadow-xs sticky top-0 z-30" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 0.625rem)' }}>
+      <header className="bg-white/90 backdrop-blur-xl border-b border-slate-200/80 px-3 py-2.5 md:px-6 flex items-center justify-between shadow-[var(--shadow-rest)] sticky top-0 z-30 transition-[box-shadow,border-color] duration-[var(--duration-base)] ease-[var(--ease-standard)]" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 0.625rem)' }}>
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-linear-to-tr from-sky-600 to-cyan-500 text-white flex items-center justify-center shadow-xs">
+          <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-linear-to-tr from-sky-600 to-cyan-500 text-white flex items-center justify-center shadow-[var(--shadow-rest)]">
             <HeartPulse className="w-5 h-5" />
           </div>
           <div>
@@ -237,7 +237,7 @@ export default function App() {
           <button
             type="button"
             onClick={() => setIsShiftModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-linear-to-r from-amber-500 to-orange-500 text-white font-bold text-xs shadow-xs hover:from-amber-600 hover:to-orange-600 touch-active cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-sm)] bg-linear-to-r from-amber-500 to-orange-500 text-white font-bold text-xs shadow-[var(--shadow-rest)] hover:shadow-[var(--shadow-hover)] hover:scale-[1.015] active:scale-[0.98] transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] cursor-pointer"
             title="Ver resumen y cerrar turno a las 16:00 hs"
           >
             <Award className="w-4 h-4" />
@@ -247,7 +247,7 @@ export default function App() {
           <button
             type="button"
             onClick={() => setIsSettingsOpen(true)}
-            className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 touch-active cursor-pointer"
+            className="p-2 rounded-[var(--radius-sm)] text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-slate-200/90 shadow-[var(--shadow-rest)] hover:shadow-[var(--shadow-hover)] active:scale-[0.98] transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] cursor-pointer"
             title="Configurar Webhook y Planilla"
           >
             <Settings className="w-4 h-4" />
@@ -260,7 +260,7 @@ export default function App() {
         {/* PANEL IZQUIERDO: Panel de Control de Ronda */}
         <aside aria-label="Panel de control del turno" className="hidden lg:block lg:col-span-4 space-y-4">
           {/* Tarjeta de Ronda y Estado del Turno */}
-          <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-xs space-y-3">
+          <div className="bg-white p-4 rounded-[var(--radius-lg)] border border-slate-200/80 shadow-[var(--shadow-rest)] space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Relevamiento del Día</span>
               <span className="text-xs font-extrabold bg-sky-100 text-sky-800 px-2.5 py-0.5 rounded-full">
@@ -272,14 +272,14 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setActiveTab('ACCESO_PERIFERICO')}
-                className={`w-full p-3 rounded-2xl border text-left flex items-center justify-between transition-all touch-active cursor-pointer ${
+                className={`w-full p-3 rounded-[var(--radius-md)] border text-left flex items-center justify-between transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] hover:-translate-y-0.5 cursor-pointer ${
                   activeTab === 'ACCESO_PERIFERICO'
-                    ? 'bg-sky-50/80 border-sky-400 text-sky-950 ring-2 ring-sky-200'
+                    ? 'bg-sky-50/90 border-sky-400 text-sky-950 ring-2 ring-sky-200 shadow-[var(--shadow-rest)]'
                     : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                 }`}
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-sky-600 text-white flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-sky-600 text-white flex items-center justify-center shadow-xs">
                     <Syringe className="w-4 h-4" />
                   </div>
                   <div>
@@ -293,14 +293,14 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setActiveTab('UPP')}
-                className={`w-full p-3 rounded-2xl border text-left flex items-center justify-between transition-all touch-active cursor-pointer ${
+                className={`w-full p-3 rounded-[var(--radius-md)] border text-left flex items-center justify-between transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] hover:-translate-y-0.5 cursor-pointer ${
                   activeTab === 'UPP'
-                    ? 'bg-rose-50/80 border-rose-400 text-rose-950 ring-2 ring-rose-200'
+                    ? 'bg-rose-50/90 border-rose-400 text-rose-950 ring-2 ring-rose-200 shadow-[var(--shadow-rest)]'
                     : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                 }`}
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-rose-600 text-white flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-rose-600 text-white flex items-center justify-center shadow-xs">
                     <Bandage className="w-4 h-4" />
                   </div>
                   <div>
@@ -314,14 +314,14 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setActiveTab('HISTORY')}
-                className={`w-full p-3 rounded-2xl border text-left flex items-center justify-between transition-all touch-active cursor-pointer ${
+                className={`w-full p-3 rounded-[var(--radius-md)] border text-left flex items-center justify-between transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] hover:-translate-y-0.5 cursor-pointer ${
                   activeTab === 'HISTORY'
-                    ? 'bg-slate-100 border-slate-400 text-slate-950 ring-2 ring-slate-300'
+                    ? 'bg-slate-100 border-slate-400 text-slate-950 ring-2 ring-slate-300 shadow-[var(--shadow-rest)]'
                     : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                 }`}
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-slate-600 text-white flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-slate-600 text-white flex items-center justify-center shadow-xs">
                     <ClipboardList className="w-4 h-4" />
                   </div>
                   <div>
@@ -334,7 +334,7 @@ export default function App() {
             </div>
 
             {/* Atajos de Chromebook */}
-            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-1.5">
+            <div className="p-3 bg-slate-50 rounded-[var(--radius-md)] border border-slate-200/80 text-xs space-y-1.5">
               <span className="font-bold text-slate-700 flex items-center gap-1.5">
                 <Keyboard className="w-3.5 h-3.5 text-sky-700" />
                 Atajos de Teclado (Chromebook)
@@ -351,7 +351,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setIsShiftModalOpen(true)}
-              className="w-full py-3 rounded-2xl bg-linear-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm touch-active cursor-pointer"
+              className="w-full py-3 rounded-[var(--radius-md)] bg-linear-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-[var(--shadow-rest)] hover:shadow-[var(--shadow-hover)] active:scale-[0.98] hover:scale-[1.015] transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] cursor-pointer"
             >
               <Award className="w-4 h-4" />
               <span>Resumen y Cierre de Turno (16:00 hs)</span>

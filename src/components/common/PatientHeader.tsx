@@ -115,12 +115,12 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
   }, [records, activeRound, patient.sector]);
 
   return (
-    <div className="bg-white border-b border-slate-200 shadow-xs sticky z-20 px-2.5 py-2 md:px-4 md:py-3 transition-all" style={{ top: 'var(--header-height)' }}>
+    <div className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-[var(--shadow-rest)] sticky z-20 px-2.5 py-2 md:px-4 md:py-3 transition-[box-shadow,border-color] duration-[var(--duration-base)] ease-[var(--ease-standard)]" style={{ top: 'var(--header-height)' }}>
       {/* Barra superior: Ronda activa, reloj, Wake Lock y avance */}
       <div className="flex items-center justify-between gap-1.5 mb-1.5">
         <div className="flex items-center gap-1.5 flex-wrap min-w-0">
           <div
-            className={`flex items-center gap-1 text-xs font-bold px-2 py-0.5 md:py-1 rounded-lg border shrink-0 ${
+            className={`flex items-center gap-1 text-xs font-bold px-2 py-0.5 md:py-1 rounded-[var(--radius-sm)] border shrink-0 ${
               isVias
                 ? 'bg-sky-50 text-sky-800 border-sky-200'
                 : 'bg-rose-50 text-rose-800 border-rose-200'
@@ -131,7 +131,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
             <span>{isVias ? 'Vías' : 'UPP'}</span>
           </div>
 
-          <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 md:py-1 rounded-lg shrink-0">
+          <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 md:py-1 rounded-[var(--radius-sm)] shrink-0">
             <Clock className="w-3 h-3 text-slate-500" />
             <span>{patient.fechaHora}</span>
           </div>
@@ -141,7 +141,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
             <button
               type="button"
               onClick={wakeLock.toggleWakeLock}
-              className={`flex items-center gap-1 text-[10px] md:text-[11px] font-bold px-2 py-0.5 md:py-1 rounded-lg border transition-all touch-active cursor-pointer shrink-0 ${
+              className={`flex items-center gap-1 text-[10px] md:text-[11px] font-bold px-2 py-0.5 md:py-1 rounded-[var(--radius-sm)] border transition-[transform,background-color,border-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer shrink-0 ${
                 wakeLock.isActive
                   ? 'bg-amber-50 text-amber-900 border-amber-300'
                   : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'
@@ -173,7 +173,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
         <div className="flex items-center gap-1.5 shrink-0">
           {/* Hint de atajos en Chromebook / PC */}
           <div
-            className="hidden lg:flex items-center gap-1 text-[11px] text-slate-600 font-mono bg-slate-50 px-2 py-1 rounded-md border border-slate-200"
+            className="hidden lg:flex items-center gap-1 text-[11px] text-slate-600 font-mono bg-slate-50 px-2 py-1 rounded-[var(--radius-sm)] border border-slate-200"
             title="Atajos de teclado activos en Chromebook"
           >
             <Keyboard className="w-3.5 h-3.5 text-slate-600" />
@@ -184,7 +184,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
           <button
             type="button"
             onClick={onNextBed}
-            className="flex items-center gap-1 bg-linear-to-r from-sky-600 to-cyan-600 text-white text-xs md:text-sm font-bold px-2.5 py-1 md:py-1.5 rounded-lg shadow-xs hover:from-sky-700 hover:to-cyan-700 touch-active cursor-pointer shrink-0"
+            className="flex items-center gap-1 bg-linear-to-r from-sky-600 to-cyan-600 text-white text-xs md:text-sm font-bold px-2.5 py-1 md:py-1.5 rounded-[var(--radius-sm)] shadow-[var(--shadow-rest)] hover:shadow-[var(--shadow-hover)] hover:-translate-y-0.5 active:scale-[0.98] transition-[transform,box-shadow,filter] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] cursor-pointer shrink-0"
             title="Mantener sector y habitación, e incrementar la cama"
           >
             <Bed className="w-3.5 h-3.5" />
@@ -205,10 +205,10 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
               key={sec}
               type="button"
               onClick={() => handleSectorChange(sec)}
-              className={`min-w-9 md:min-w-10 h-8 md:h-9 px-2 md:px-2.5 rounded-lg font-bold text-xs md:text-sm border transition-all touch-active cursor-pointer shrink-0 ${
+              className={`min-w-9 md:min-w-10 h-8 md:h-9 px-2 md:px-2.5 rounded-[var(--radius-sm)] font-bold text-xs md:text-sm border transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer shrink-0 ${
                 patient.sector === sec
-                  ? 'bg-sky-700 text-white border-sky-700 shadow-xs ring-2 ring-sky-200'
-                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                  ? 'bg-sky-700 text-white border-sky-700 shadow-[var(--shadow-rest)] ring-2 ring-sky-200 hover:scale-[1.015]'
+                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
               }`}
             >
               {sec}
@@ -220,7 +220,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
         <button
           type="button"
           onClick={() => setIsMatrixOpen(true)}
-          className="flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-lg bg-sky-50 text-sky-900 border border-sky-200 hover:bg-sky-100 touch-active cursor-pointer shrink-0 shadow-2xs"
+          className="flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-[var(--radius-sm)] bg-sky-50 text-sky-900 border border-sky-200 hover:bg-sky-100 shadow-[var(--shadow-rest)] hover:shadow-[var(--shadow-hover)] hover:-translate-y-0.5 active:scale-[0.98] transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] cursor-pointer shrink-0"
           title="Ver mapa de camas del sector (cuáles faltan censar)"
         >
           <MapPin className="w-3.5 h-3.5 text-sky-700" />
@@ -328,7 +328,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
             <button
               type="button"
               onClick={() => handleRoomStep(-1)}
-              className="w-8 h-8 md:w-9 md:h-9 rounded-md bg-white border border-slate-200 text-slate-600 flex items-center justify-center font-bold text-xs hover:bg-slate-100 touch-active cursor-pointer relative before:absolute before:-inset-1 before:content-['']"
+              className="w-8 h-8 md:w-9 md:h-9 rounded-[var(--radius-sm)] bg-white border border-slate-200 text-slate-600 flex items-center justify-center font-bold text-xs hover:bg-slate-100 transition-[transform,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer relative before:absolute before:-inset-1 before:content-['']"
               title="Habitación anterior válida"
             >
               <Minus className="w-3 h-3" />
@@ -336,7 +336,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
             <button
               type="button"
               onClick={() => handleRoomStep(1)}
-              className="w-8 h-8 md:w-9 md:h-9 rounded-md bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs hover:bg-slate-300 touch-active cursor-pointer relative before:absolute before:-inset-1 before:content-['']"
+              className="w-8 h-8 md:w-9 md:h-9 rounded-[var(--radius-sm)] bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs hover:bg-slate-300 transition-[transform,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer relative before:absolute before:-inset-1 before:content-['']"
               title="Siguiente habitación válida"
             >
               <Plus className="w-3 h-3" />
@@ -345,7 +345,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
         </div>
 
         {/* Historia Clínica (HC) */}
-        <div className="col-span-6 sm:col-span-3 flex items-center bg-slate-50 border border-slate-200 rounded-xl px-2 py-1 focus-within:border-sky-500 focus-within:bg-white focus-within:ring-1 focus-within:ring-sky-100">
+        <div className="col-span-6 sm:col-span-3 flex items-center bg-slate-50 border border-slate-200 rounded-[var(--radius-sm)] px-2 py-1 focus-within:border-sky-500 focus-within:bg-white focus-within:ring-1 focus-within:ring-sky-100">
           <FileText className="w-3.5 h-3.5 text-slate-500 mr-1.5 shrink-0" />
           <div className="flex flex-col flex-1 min-w-0">
             <span className="text-[11px] md:text-xs uppercase font-bold text-slate-600 leading-tight">
@@ -362,7 +362,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
         </div>
 
         {/* Camas: Selector de 1 toque (Chips 1, 2, 3, 4 - Máximo 4) */}
-        <div className="col-span-12 sm:col-span-5 flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-2 py-1">
+        <div className="col-span-12 sm:col-span-5 flex items-center justify-between bg-slate-50 border border-slate-200 rounded-[var(--radius-sm)] px-2 py-1">
           <div className="flex items-center gap-1.5 flex-1 overflow-x-auto">
             <Bed className="w-3.5 h-3.5 text-slate-600 shrink-0" />
             <span className="text-[11px] md:text-xs uppercase font-bold text-slate-600 mr-0.5 shrink-0">
@@ -373,10 +373,10 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
                 key={bedNum}
                 type="button"
                 onClick={() => onChange({ cama: bedNum })}
-                className={`flex-1 sm:flex-none w-10 h-10 rounded-lg font-bold text-xs md:text-sm border transition-all touch-active cursor-pointer ${
+                className={`flex-1 sm:flex-none w-10 h-10 rounded-[var(--radius-sm)] font-bold text-xs md:text-sm border transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer ${
                   patient.cama === bedNum
-                    ? 'bg-sky-700 text-white border-sky-700 shadow-xs'
-                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                    ? 'bg-sky-700 text-white border-sky-700 shadow-[var(--shadow-rest)] ring-2 ring-sky-200 hover:scale-[1.015]'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300 hover:shadow-[var(--shadow-rest)]'
                 }`}
               >
                 {bedNum}

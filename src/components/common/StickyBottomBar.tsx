@@ -53,7 +53,7 @@ export const StickyBottomBar: React.FC<StickyBottomBarProps> = ({
   }
 
   return (
-    <div className="fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-2xl py-2.5 px-3 md:px-6">
+    <div className="fixed bottom-0 inset-x-0 z-30 bg-white/90 backdrop-blur-xl border-t border-slate-200/80 shadow-[var(--shadow-elevated)] py-2.5 px-3 md:px-6 transition-[box-shadow,border-color] duration-[var(--duration-base)] ease-[var(--ease-standard)]">
       <div className="max-w-2xl mx-auto flex items-center justify-between gap-2.5">
         {/* Contexto compacto a la izquierda (visible en tablet/desktop o pequeño en móvil) */}
         <div className="hidden xs:flex flex-col min-w-0 pr-1">
@@ -80,7 +80,7 @@ export const StickyBottomBar: React.FC<StickyBottomBarProps> = ({
             }
           }}
           disabled={isSubmitting}
-          className={`flex-1 min-h-[50px] md:min-h-[54px] rounded-2xl font-black text-sm md:text-base flex items-center justify-center gap-2 shadow-lg touch-active cursor-pointer transition-all ${buttonBg} disabled:opacity-60`}
+          className={`group flex-1 min-h-[50px] md:min-h-[54px] rounded-[var(--radius-md)] font-black text-sm md:text-base flex items-center justify-center gap-2 shadow-[var(--shadow-hover)] cursor-pointer transition-[transform,box-shadow,background-color,filter] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 ${buttonBg} disabled:opacity-60 disabled:hover:scale-100 disabled:hover:translate-y-0`}
         >
           {isSubmitting ? (
             <>
@@ -89,9 +89,13 @@ export const StickyBottomBar: React.FC<StickyBottomBarProps> = ({
             </>
           ) : (
             <>
-              {hasCondition ? <Save className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
+              {hasCondition ? (
+                <Save className="w-5 h-5 transition-transform duration-[var(--duration-fast)] ease-[var(--ease-standard)] group-hover:scale-110" />
+              ) : (
+                <CheckCircle className="w-5 h-5 transition-transform duration-[var(--duration-fast)] ease-[var(--ease-standard)] group-hover:scale-110" />
+              )}
               <span>{buttonText}</span>
-              <span className="text-[11px] bg-black/20 px-2 py-0.5 rounded font-mono hidden sm:inline">
+              <span className="text-[11px] bg-black/20 px-2 py-0.5 rounded-[var(--radius-sm)] font-mono hidden sm:inline">
                 [Enter]
               </span>
             </>

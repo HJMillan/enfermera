@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./styles/theme.css";
 
 @layer base {
   :root {
@@ -48,15 +49,21 @@
     user-select: text;
     -webkit-user-select: text;
   }
+
+  /* Focus accesible con halo sutil tipo macOS/iOS sin romper diseño táctil */
+  :focus-visible {
+    outline: 2px solid var(--app-primary);
+    outline-offset: 2px;
+  }
 }
 
-/* Micro-interacciones táctiles tipo iOS */
+/* Micro-interacciones táctiles con física perceptual Apple */
 .touch-active {
-  transition: transform 0.08s cubic-bezier(0.2, 0, 0, 1), filter 0.08s ease;
+  transition: transform var(--duration-fast) var(--ease-snappy), filter var(--duration-fast) var(--ease-smooth);
 }
 .touch-active:active {
-  transform: scale(0.96);
-  filter: brightness(0.94);
+  transform: scale(0.98);
+  filter: brightness(0.96);
 }
 
 /* Barra de desplazamiento suave para iOS */

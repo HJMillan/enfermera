@@ -70,8 +70,8 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs">
-      <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-950/60 backdrop-blur-md transition-opacity duration-[var(--duration-base)] ease-[var(--ease-smooth)]">
+      <div className="bg-white w-full max-w-lg rounded-[var(--radius-lg)] shadow-[var(--shadow-elevated)] border border-slate-200/80 overflow-hidden flex flex-col max-h-[90vh] transition-[transform,box-shadow] duration-[var(--duration-base)] ease-[var(--ease-standard)]">
         {/* Cabecera */}
         <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-gradient-to-r from-sky-700 to-cyan-700 text-white">
           <div className="flex items-center gap-2">
@@ -84,7 +84,7 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-xl text-white/80 hover:text-white hover:bg-white/10 touch-active cursor-pointer"
+            className="p-1.5 rounded-[var(--radius-sm)] text-white/80 hover:text-white hover:bg-white/10 transition-[transform,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -94,24 +94,24 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
         <div className="p-4 overflow-y-auto space-y-4 text-sm">
           {/* Métricas Generales */}
           <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="bg-slate-50 border border-slate-200 p-3 rounded-2xl">
+            <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-[var(--radius-md)] shadow-[var(--shadow-rest)] transition-[transform,box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-hover)] hover:-translate-y-0.5">
               <span className="text-2xl font-black text-slate-900 block">{records.length}</span>
               <span className="text-[11px] font-bold text-slate-600 uppercase">Total Registros</span>
             </div>
 
-            <div className="bg-sky-50 border border-sky-100 p-3 rounded-2xl">
+            <div className="bg-sky-50/80 border border-sky-100 p-3 rounded-[var(--radius-md)] shadow-[var(--shadow-rest)] transition-[transform,box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-hover)] hover:-translate-y-0.5">
               <span className="text-2xl font-black text-sky-800 block">{viasRecords.length}</span>
               <span className="text-[11px] font-bold text-sky-700 uppercase">Camas Vías</span>
             </div>
 
-            <div className="bg-rose-50 border border-rose-100 p-3 rounded-2xl">
+            <div className="bg-rose-50/80 border border-rose-100 p-3 rounded-[var(--radius-md)] shadow-[var(--shadow-rest)] transition-[transform,box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-hover)] hover:-translate-y-0.5">
               <span className="text-2xl font-black text-rose-800 block">{uppRecords.length}</span>
               <span className="text-[11px] font-bold text-rose-700 uppercase">Camas UPP</span>
             </div>
           </div>
 
           {/* Desglose Ronda 1: Vías */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-3.5 space-y-2 shadow-xs">
+          <div className="bg-white border border-slate-200/80 rounded-[var(--radius-md)] p-3.5 space-y-2 shadow-[var(--shadow-rest)]">
             <div className="flex items-center justify-between">
               <span className="font-bold text-slate-800 text-xs uppercase flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-sky-600"></span>
@@ -120,11 +120,11 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
               <span className="text-xs font-extrabold text-slate-700">{viasRecords.length} evaluadas</span>
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="bg-slate-50 p-2 rounded-xl flex justify-between items-center">
+              <div className="bg-slate-50 p-2 rounded-[var(--radius-sm)] flex justify-between items-center">
                 <span className="text-slate-600">Pacientes con vía:</span>
                 <span className="font-bold text-sky-800">{viasConAcceso}</span>
               </div>
-              <div className="bg-slate-50 p-2 rounded-xl flex justify-between items-center">
+              <div className="bg-slate-50 p-2 rounded-[var(--radius-sm)] flex justify-between items-center">
                 <span className="text-slate-600">Sin acceso venoso:</span>
                 <span className="font-bold text-slate-700">{viasSinAcceso}</span>
               </div>
@@ -132,7 +132,7 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
           </div>
 
           {/* Desglose Ronda 2: UPP */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-3.5 space-y-2 shadow-xs">
+          <div className="bg-white border border-slate-200/80 rounded-[var(--radius-md)] p-3.5 space-y-2 shadow-[var(--shadow-rest)]">
             <div className="flex items-center justify-between">
               <span className="font-bold text-slate-800 text-xs uppercase flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-rose-600"></span>
@@ -141,52 +141,51 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
               <span className="text-xs font-extrabold text-slate-700">{uppRecords.length} evaluadas</span>
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="bg-slate-50 p-2 rounded-xl flex justify-between items-center">
-                <span className="text-slate-600">Pacientes con UPP:</span>
+              <div className="bg-slate-50 p-2 rounded-[var(--radius-sm)] flex justify-between items-center">
+                <span className="text-slate-600">Con lesión:</span>
                 <span className="font-bold text-rose-800">{uppConLesion}</span>
               </div>
-              <div className="bg-slate-50 p-2 rounded-xl flex justify-between items-center">
+              <div className="bg-slate-50 p-2 rounded-[var(--radius-sm)] flex justify-between items-center">
                 <span className="text-slate-600">Piel íntegra:</span>
                 <span className="font-bold text-emerald-800">{uppPielIntegra}</span>
               </div>
             </div>
           </div>
 
-          {/* Sección de Envío por Correo Electrónico */}
-          <div className="bg-gradient-to-br from-sky-50 to-blue-50/70 border border-sky-200 rounded-2xl p-3.5 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-sky-600 text-white">
-                  <Mail className="w-4 h-4" />
-                </div>
-                <div>
-                  <span className="font-bold text-slate-900 text-xs block">Despacho de Reporte por Correo</span>
-                  <span className="text-[11px] text-slate-600">Solo enviará los registros pendientes no despachados previamente</span>
-                </div>
-              </div>
+          {/* Despacho del Reporte por Email */}
+          <div className="bg-sky-50/70 border border-sky-200 rounded-[var(--radius-md)] p-3.5 space-y-2.5 shadow-[var(--shadow-rest)]">
+            <div className="flex items-center gap-2 text-sky-900 font-bold text-xs uppercase">
+              <Mail className="w-4 h-4 text-sky-700" />
+              <span>Despacho de Informe por Correo Electrónico</span>
             </div>
+            <p className="text-xs text-sky-800">
+              Al hacer clic en el botón de abajo, se enviará automáticamente el resumen ejecutivo del turno con las estadísticas clave a los correos registrados.
+            </p>
 
-            <div className="bg-white/80 border border-sky-100 rounded-xl p-2 text-xs space-y-1">
-              <span className="text-[10px] font-bold uppercase text-slate-600 block">Destinatarios:</span>
+            <div className="bg-white/80 p-2 rounded-[var(--radius-sm)] border border-sky-100 text-xs text-slate-700 space-y-1">
+              <span className="font-semibold text-sky-900 block">Destinatarios configurados:</span>
               <div className="flex flex-wrap gap-1">
-                {emails.map((email) => (
-                  <span key={email} className="px-2 py-0.5 rounded-md bg-sky-100 text-sky-800 font-mono text-[11px] font-semibold">
-                    {email}
+                {emails.map((m) => (
+                  <span key={m} className="bg-sky-100 text-sky-800 font-mono text-[10px] px-2 py-0.5 rounded-[var(--radius-sm)]">
+                    {m}
                   </span>
                 ))}
               </div>
             </div>
 
-            {sendStatus.type === 'success' && (
-              <div className="p-2.5 rounded-xl bg-emerald-100/80 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 stroke-[2.5]" />
-                <span>{sendStatus.message}</span>
-              </div>
-            )}
-
-            {sendStatus.type === 'error' && (
-              <div className="p-2.5 rounded-xl bg-rose-100/80 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 stroke-[2.5]" />
+            {sendStatus.type !== 'idle' && (
+              <div
+                className={`p-2.5 rounded-[var(--radius-sm)] text-xs flex items-center gap-2 ${
+                  sendStatus.type === 'success'
+                    ? 'bg-emerald-100 border border-emerald-300 text-emerald-900'
+                    : 'bg-rose-100 border border-rose-300 text-rose-900'
+                }`}
+              >
+                {sendStatus.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-700" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-700" />
+                )}
                 <span>{sendStatus.message}</span>
               </div>
             )}
@@ -195,7 +194,7 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
               type="button"
               onClick={handleSendEmailReport}
               disabled={isSending}
-              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 text-white font-bold text-xs shadow-md shadow-sky-200 flex items-center justify-center gap-2 touch-active cursor-pointer disabled:opacity-60"
+              className="w-full py-2.5 px-4 rounded-[var(--radius-sm)] bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 text-white font-bold text-xs shadow-[var(--shadow-rest)] hover:shadow-[var(--shadow-hover)] transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
             >
               {isSending ? (
                 <>
@@ -212,7 +211,7 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
           </div>
 
           {/* Estado de Sincronización Local */}
-          <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
+          <div className="p-3 rounded-[var(--radius-md)] bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
               {pendientesSync === 0 ? (
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -233,7 +232,7 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
           <button
             type="button"
             onClick={exportRecordsToCSV}
-            className="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-slate-100 touch-active cursor-pointer"
+            className="flex-1 py-2.5 rounded-[var(--radius-sm)] border border-slate-300 text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-slate-100 shadow-[var(--shadow-rest)] hover:shadow-[var(--shadow-hover)] transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer"
           >
             <Download className="w-4 h-4" />
             <span>Descargar CSV</span>
@@ -242,7 +241,7 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="py-2.5 px-6 rounded-xl bg-slate-200 text-slate-800 hover:bg-slate-300 font-bold text-xs touch-active cursor-pointer"
+            className="py-2.5 px-6 rounded-[var(--radius-sm)] bg-slate-200 text-slate-800 hover:bg-slate-300 font-bold text-xs transition-[transform,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer"
           >
             Cerrar
           </button>

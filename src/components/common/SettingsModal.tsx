@@ -105,8 +105,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs">
-      <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-200 overflow-hidden max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-950/60 backdrop-blur-md transition-opacity duration-[var(--duration-base)] ease-[var(--ease-smooth)]">
+      <div className="bg-white w-full max-w-lg rounded-[var(--radius-lg)] shadow-[var(--shadow-elevated)] border border-slate-200/80 overflow-hidden max-h-[90vh] flex flex-col transition-[transform,box-shadow] duration-[var(--duration-base)] ease-[var(--ease-standard)]">
         {/* Cabecera */}
         <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
           <div className="flex items-center gap-2">
@@ -116,7 +116,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 touch-active cursor-pointer"
+            className="p-1.5 rounded-[var(--radius-sm)] text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 transition-[transform,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -138,7 +138,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://script.google.com/macros/s/.../exec"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs md:text-sm font-mono focus:border-sky-600 focus:ring-2 focus:ring-sky-100 outline-none"
+              className="w-full px-3.5 py-2.5 rounded-[var(--radius-sm)] border border-slate-300 text-xs md:text-sm font-mono focus:border-sky-600 focus:ring-2 focus:ring-sky-100 outline-none transition-[background-color,border-color,box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-smooth)]"
             />
           </div>
 
@@ -148,7 +148,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
               type="button"
               onClick={handleTestConnection}
               disabled={testStatus === 'testing'}
-              className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 touch-active cursor-pointer"
+              className="px-3.5 py-2 rounded-[var(--radius-sm)] bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 shadow-[var(--shadow-rest)] hover:shadow-[var(--shadow-hover)] transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${testStatus === 'testing' ? 'animate-spin text-sky-700' : ''}`} />
               <span>{testStatus === 'testing' ? 'Probando...' : 'Probar Conexión'}</span>
@@ -180,16 +180,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
               value={emailsText}
               onChange={(e) => setEmailsText(e.target.value)}
               placeholder="jesusmillan86@gmail.com, pamelaestua91@gmail.com"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs md:text-sm font-mono focus:border-sky-600 focus:ring-2 focus:ring-sky-100 outline-none"
+              className="w-full px-3.5 py-2.5 rounded-[var(--radius-sm)] border border-slate-300 text-xs md:text-sm font-mono focus:border-sky-600 focus:ring-2 focus:ring-sky-100 outline-none transition-[background-color,border-color,box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-smooth)]"
             />
           </div>
 
           {/* Guía rápida de Google Sheets */}
-          <div className="border border-sky-100 bg-sky-50/60 rounded-2xl p-3.5">
+          <div className="border border-sky-100 bg-sky-50/70 rounded-[var(--radius-md)] p-3.5 shadow-[var(--shadow-rest)]">
             <button
               type="button"
               onClick={() => setShowInstructions(!showInstructions)}
-              className="w-full flex items-center justify-between font-bold text-sky-900 text-xs touch-active cursor-pointer"
+              className="w-full flex items-center justify-between font-bold text-sky-900 text-xs cursor-pointer"
             >
               <span className="flex items-center gap-1.5">
                 <FileSpreadsheet className="w-4 h-4 text-sky-700" />
@@ -210,9 +210,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
           </div>
 
           {/* Instalación como App Nativa (PWA / Offline) */}
-          <div className="border border-slate-200 bg-slate-50/80 rounded-2xl p-3.5 flex items-center justify-between gap-2">
+          <div className="border border-slate-200/80 bg-slate-50/90 rounded-[var(--radius-md)] p-3.5 flex items-center justify-between gap-2 shadow-[var(--shadow-rest)]">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
+              <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
                 <Smartphone className="w-4 h-4" />
               </div>
               <div className="min-w-0">
@@ -231,7 +231,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
               <button
                 type="button"
                 onClick={handleInstallPWA}
-                className="px-3 py-1.5 rounded-xl bg-sky-700 hover:bg-sky-800 text-white font-bold text-xs flex items-center gap-1 shadow-xs touch-active cursor-pointer shrink-0"
+                className="px-3 py-1.5 rounded-[var(--radius-sm)] bg-sky-700 hover:bg-sky-800 text-white font-bold text-xs flex items-center gap-1 shadow-[var(--shadow-rest)] hover:shadow-[var(--shadow-hover)] transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] cursor-pointer shrink-0"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Instalar</span>
@@ -248,7 +248,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
             <button
               type="button"
               onClick={handleClearHistory}
-              className="px-3 py-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold flex items-center gap-1 touch-active cursor-pointer"
+              className="px-3 py-1.5 rounded-[var(--radius-sm)] border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold flex items-center gap-1 shadow-[var(--shadow-rest)] hover:shadow-[var(--shadow-hover)] transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>Vaciar</span>
@@ -261,14 +261,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-100 touch-active cursor-pointer"
+            className="flex-1 py-2.5 rounded-[var(--radius-sm)] border border-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-100 shadow-[var(--shadow-rest)] hover:shadow-[var(--shadow-hover)] transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer"
           >
             Cancelar
           </button>
           <button
             type="button"
             onClick={handleSave}
-            className="flex-1 py-2.5 rounded-xl bg-sky-700 text-white font-bold text-sm shadow-md shadow-sky-200 hover:bg-sky-800 touch-active cursor-pointer"
+            className="flex-1 py-2.5 rounded-[var(--radius-sm)] bg-sky-700 text-white font-bold text-sm shadow-[var(--shadow-hover)] hover:bg-sky-800 transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] cursor-pointer"
           >
             Guardar Configuración
           </button>
