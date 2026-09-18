@@ -10,10 +10,31 @@ import {
   ChevronDown,
   ChevronUp,
   Trash2,
+  Tag,
+  ShieldAlert,
+  Activity,
+  Eye,
+  Layers,
+  HeartPulse,
+  LifeBuoy,
+  Calendar,
+  Check,
+  X,
+  Users,
 } from 'lucide-react';
 import type { StoredRecord, AccesoPerifericoForm, UppForm } from '../../types/form';
 import { retryRecordSync } from '../../services/webhookService';
 import { exportRecordsToCSV, deleteRecordLocally, clearStoredRecords } from '../../services/storageService';
+
+const getBradenRiskBadge = (score: number) => {
+  if (score <= 12) {
+    return { label: 'Riesgo Alto', color: 'bg-rose-100 text-rose-800 border-rose-200' };
+  }
+  if (score <= 14) {
+    return { label: 'Riesgo Moderado', color: 'bg-amber-100 text-amber-800 border-amber-200' };
+  }
+  return { label: 'Riesgo Bajo', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
+};
 
 interface HistoryViewProps {
   records: StoredRecord[];
@@ -46,7 +67,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
   };
 
   return (
-    <div className="px-3 pb-24 md:px-4 space-y-3.5 max-w-2xl mx-auto">
+    <div className="px-3 pb-24 md:px-4 space-y-3.5 max-w-2xl lg:max-w-none mx-auto">
       {/* Barra de Acciones y Resumen */}
       <div className="bg-white p-4 rounded-[var(--radius-md)] border border-slate-200/80 shadow-[var(--shadow-rest)] space-y-3">
         <div className="flex items-center justify-between">
@@ -146,6 +167,15 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
             const dataAcceso = isAcceso ? (item.data as AccesoPerifericoForm) : null;
             const dataUpp = !isAcceso ? (item.data as UppForm) : null;
 
+            const ubicacionesAccesoList = dataAcceso
+              ? [
+                  dataAcceso.ubicacionMSD && 'MSD (Brazo Der)',
+                  dataAcceso.ubicacionMSI && 'MSI (Brazo Izq)',
+                  dataAcceso.ubicacionMID && 'MID (Pierna Der)',
+                  dataAcceso.ubicacionMII && 'MII (Pierna Izq)',
+                ].filter(Boolean) as string[]
+              : [];
+
             const ubicacionesAcceso = dataAcceso
               ? [
                   dataAcceso.ubicacionMSD && 'MSD',
@@ -156,6 +186,61 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                   .filter(Boolean)
                   .join(', ')
               : '';
+
+            const ubicacionesUppList = dataUpp
+              ? [
+                  dataUpp.ubicacionSacra && 'Sacra',
+                  dataUpp.ubicacionTalon && 'Talón',
+                  dataUpp.ubicacionGluteo && 'Glúteo',
+                  dataUpp.ubicacionPosterior && 'Posterior',
+                  dataUpp.ubicacionOtro && dataUpp.ubicacionOtro.trim(),
+                ].filter(Boolean) as string[]
+              : [];
+
+            const materialesFijacionList = dataAcceso
+              ? [
+                  dataAcceso.fijacionTegaderm && 'Tegaderm',
+                  dataAcceso.fijacionCinta &&
+                    (dataAcceso.fijacionCintaTipo
+                      ? `Cinta (${dataAcceso.fijacionCintaTipo})`
+                      : 'Cinta'),
+                  dataAcceso.fijacionHipafix && 'Hipafix',
+                  dataAcceso.fijacionVenda && 'Venda',
+                  dataAcceso.fijacionContencionMecanica && 'Contención Mecánica',
+                ].filter(Boolean) as string[]
+              : [];
+
+            const rotuloAuditoria = dataAcceso?.tieneRotulo
+              ? [
+                  { label: 'Fecha', ok: Boolean(dataAcceso.rotuloTieneFecha) },
+                  {
+                    label: 'Enfermero',
+                    ok: Boolean(dataAcceso.rotuloTieneEnfermero ?? dataAcceso.rotuloTieneNombre),
+                  },
+                  { label: 'Legajo', ok: Boolean(dataAcceso.rotuloTieneLegajo) },
+                  { label: 'Turno', ok: Boolean(dataAcceso.rotuloTieneTurno) },
+                  { label: 'ABB', ok: Boolean(dataAcceso.rotuloTieneABB) },
+                ]
+              : [];
+
+            const percutaneoRotuloAuditoria =
+              !dataAcceso?.tieneAcceso &&
+              dataAcceso?.tipoAccesoAlternativo === 'percutaneo' &&
+              dataAcceso?.tieneRotulo
+                ? [
+                    { label: 'Fecha', ok: Boolean(dataAcceso.rotuloTieneFecha) },
+                    {
+                      label: 'Enfermero',
+                      ok: Boolean(dataAcceso.rotuloTieneEnfermero ?? dataAcceso.rotuloTieneNombre),
+                    },
+                    { label: 'Legajo', ok: Boolean(dataAcceso.rotuloTieneLegajo) },
+                    { label: 'Turno', ok: Boolean(dataAcceso.rotuloTieneTurno) },
+                    { label: 'ABB', ok: Boolean(dataAcceso.rotuloTieneABB) },
+                  ]
+                : [];
+
+            const bradenInfo =
+              dataUpp?.escalaBraden !== undefined ? getBradenRiskBadge(dataUpp.escalaBraden) : null;
 
             const gradosUpp = dataUpp
               ? [
@@ -286,138 +371,582 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
 
                 {/* Detalle desplegable */}
                 {isExpanded && (
-                  <div className="px-4 pb-3.5 pt-1 border-t border-slate-100 bg-slate-50/70 text-xs space-y-2">
-                    <div className="grid grid-cols-2 gap-2 text-slate-700">
-                      <div>
-                        <span className="font-bold text-slate-600 block">Tipo Formulario:</span>
-                        <span>{isAcceso ? 'Acceso Periférico' : 'Úlcera por Presión (UPP)'}</span>
+                  <div className="px-4 pb-4 pt-2 border-t border-slate-100 bg-slate-50/70 text-xs space-y-3">
+                    {/* Encabezado del Detalle */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-200/80">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-slate-800 text-xs">
+                            {isAcceso ? 'Acceso Periférico' : 'Úlcera por Presión (UPP)'}
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
+                            ID: {item.id}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-600">
+                          Hab. {item.data.habitacion} · Cama {item.data.cama}{' '}
+                          {item.data.historiaClinica && `· HC: ${item.data.historiaClinica}`}
+                        </div>
                       </div>
-                      <div>
-                        <span className="font-bold text-slate-600 block">ID Registro:</span>
-                        <span className="font-mono text-[10px]">{item.id}</span>
-                      </div>
+
+                      {(item.data.cantidadEnfermeras !== undefined ||
+                        item.data.cantidadAuxiliares !== undefined) && (
+                        <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-700 bg-white px-2.5 py-1 rounded-md border border-slate-200 shadow-xs">
+                          <Users className="w-3.5 h-3.5 text-sky-700" />
+                          <span>
+                            Dotación: {item.data.cantidadEnfermeras ?? 0} Enf. ·{' '}
+                            {item.data.cantidadAuxiliares ?? 0} Aux.
+                          </span>
+                        </div>
+                      )}
                     </div>
 
+                    {/* CASO 1: Acceso Periférico Activo */}
                     {isAcceso && dataAcceso && dataAcceso.tieneAcceso && (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 border-t border-slate-200/60 text-slate-700">
-                        <div>
-                          <span className="font-bold text-slate-600 block">Cantidad:</span>
-                          <span>{dataAcceso.cuantas || 1}</span>
+                      <div className="space-y-2.5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                          {/* A. Vía & Rótulo */}
+                          <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-xs space-y-2">
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                              <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                                <Tag className="w-3.5 h-3.5 text-sky-700" />
+                                Vía y Rótulo de Identificación
+                              </span>
+                              <span className="text-[10px] font-extrabold text-sky-800 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
+                                {dataAcceso.cuantas || 1} {dataAcceso.cuantas === 1 ? 'vía' : 'vías'}
+                              </span>
+                            </div>
+
+                            <div>
+                              <span className="text-[11px] font-bold text-slate-600 block mb-1">
+                                Ubicación anatómica:
+                              </span>
+                              <div className="flex flex-wrap gap-1.5">
+                                {ubicacionesAccesoList.length > 0 ? (
+                                  ubicacionesAccesoList.map((ubic) => (
+                                    <span
+                                      key={ubic}
+                                      className="text-[11px] font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200"
+                                    >
+                                      {ubic}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-slate-600 italic text-[11px]">-</span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="pt-1.5 border-t border-slate-100">
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-[11px] font-bold text-slate-600">Rótulo:</span>
+                                <span
+                                  className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${
+                                    dataAcceso.tieneRotulo
+                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                      : 'bg-rose-100 text-rose-800 border border-rose-200'
+                                  }`}
+                                >
+                                  {dataAcceso.tieneRotulo ? 'SÍ (Colocado)' : 'NO (Sin rótulo)'}
+                                </span>
+                              </div>
+
+                              {dataAcceso.tieneRotulo && (
+                                <div className="grid grid-cols-3 gap-1 pt-1">
+                                  {rotuloAuditoria.map((it) => (
+                                    <span
+                                      key={it.label}
+                                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center justify-between border ${
+                                        it.ok
+                                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                          : 'bg-slate-100 text-slate-600 border-slate-200'
+                                      }`}
+                                    >
+                                      <span>{it.label}</span>
+                                      {it.ok ? (
+                                        <Check className="w-3 h-3 text-emerald-600" />
+                                      ) : (
+                                        <X className="w-3 h-3 text-slate-600" />
+                                      )}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* B. Inspección y Fijación */}
+                          <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-xs space-y-2">
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                              <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                                <Eye className="w-3.5 h-3.5 text-sky-700" />
+                                Inspección y Fijación
+                              </span>
+                              <span
+                                className={`text-[10px] font-extrabold px-2 py-0.5 rounded flex items-center gap-1 border ${
+                                  dataAcceso.visibilidad
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                    : 'bg-amber-50 text-amber-800 border-amber-200'
+                                }`}
+                              >
+                                {dataAcceso.visibilidad ? (
+                                  <>
+                                    <Check className="w-3 h-3 text-emerald-600" />
+                                    <span>Punto visible</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <AlertCircle className="w-3 h-3 text-amber-600" />
+                                    <span>No visible</span>
+                                  </>
+                                )}
+                              </span>
+                            </div>
+
+                            <div>
+                              <span className="text-[11px] font-bold text-slate-600 block mb-1">
+                                Materiales de fijación:
+                              </span>
+                              <div className="flex flex-wrap gap-1.5">
+                                {materialesFijacionList.length > 0 ? (
+                                  materialesFijacionList.map((mat) => (
+                                    <span
+                                      key={mat}
+                                      className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200"
+                                    >
+                                      {mat}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-slate-600 italic text-[11px]">
+                                    Sin fijación declarada
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-1.5 border-t border-slate-100">
+                              <span className="text-[11px] font-bold text-slate-600">Adherencia:</span>
+                              <span
+                                className={`text-[11px] font-extrabold px-2 py-0.5 rounded uppercase border ${
+                                  dataAcceso.fijacionAdherencia === 'total'
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                    : dataAcceso.fijacionAdherencia === 'parcial'
+                                    ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                    : 'bg-rose-50 text-rose-800 border-rose-200'
+                                }`}
+                              >
+                                {dataAcceso.fijacionAdherencia || '-'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* C. Lúmenes y Conectores */}
+                          <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-xs space-y-2">
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                              <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                                <Layers className="w-3.5 h-3.5 text-sky-700" />
+                                Lúmenes / Conectores
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                              <div
+                                className={`p-2 rounded-md border flex items-center justify-between ${
+                                  dataAcceso.lumenesLlave3Vias
+                                    ? 'bg-sky-50/80 border-sky-200 text-sky-900'
+                                    : 'bg-slate-50 border-slate-200 text-slate-600'
+                                }`}
+                              >
+                                <span className="text-xs font-bold">Llave 3 vías</span>
+                                <span className="text-[11px] font-extrabold">
+                                  {dataAcceso.lumenesLlave3Vias ? 'SÍ' : 'NO'}
+                                </span>
+                              </div>
+
+                              <div
+                                className={`p-2 rounded-md border flex items-center justify-between ${
+                                  dataAcceso.lumenesTaponMultifuncion
+                                    ? 'bg-sky-50/80 border-sky-200 text-sky-900'
+                                    : 'bg-slate-50 border-slate-200 text-slate-600'
+                                }`}
+                              >
+                                <span className="text-xs font-bold">Tapón multif.</span>
+                                <span className="text-[11px] font-extrabold">
+                                  {dataAcceso.lumenesTaponMultifuncion ? 'SÍ' : 'NO'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* D. Signos Clínicos e Infusión */}
+                          <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-xs space-y-2">
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                              <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                                <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
+                                Evaluación Clínica e Infusión
+                              </span>
+                              <span className="text-[11px] font-extrabold text-sky-900 bg-sky-50 px-2 py-0.5 rounded border border-sky-200 capitalize flex items-center gap-1">
+                                <Activity className="w-3 h-3 text-sky-700" />
+                                {dataAcceso.infusionType || 'Sin infusión'}
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-1.5">
+                              <span
+                                className={`text-[10px] font-bold p-1.5 rounded text-center border ${
+                                  dataAcceso.caracteristicasInfiltracion
+                                    ? 'bg-rose-100 text-rose-800 border-rose-300'
+                                    : 'bg-slate-50 text-slate-700 border-slate-200'
+                                }`}
+                              >
+                                {dataAcceso.caracteristicasInfiltracion
+                                  ? '⚠️ Infiltración'
+                                  : 'Sin infiltración'}
+                              </span>
+
+                              <span
+                                className={`text-[10px] font-bold p-1.5 rounded text-center border ${
+                                  dataAcceso.caracteristicasEritematoso
+                                    ? 'bg-rose-100 text-rose-800 border-rose-300'
+                                    : 'bg-slate-50 text-slate-700 border-slate-200'
+                                }`}
+                              >
+                                {dataAcceso.caracteristicasEritematoso
+                                  ? '⚠️ Eritematoso'
+                                  : 'Sin eritema'}
+                              </span>
+
+                              <span
+                                className={`text-[10px] font-bold p-1.5 rounded text-center border ${
+                                  dataAcceso.caracteristicasRetorno
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                    : 'bg-amber-50 text-amber-800 border-amber-200'
+                                }`}
+                              >
+                                {dataAcceso.caracteristicasRetorno
+                                  ? '✓ Retorno venoso'
+                                  : 'Sin retorno'}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <span className="font-bold text-slate-600 block">Ubicación:</span>
-                          <span>{ubicacionesAcceso || '-'}</span>
-                        </div>
-                        <div>
-                          <span className="font-bold text-slate-600 block">Rótulo:</span>
-                          <span>{dataAcceso.tieneRotulo ? 'SÍ' : 'NO'}</span>
-                        </div>
-                        <div>
-                          <span className="font-bold text-slate-600 block">Fijación Cinta:</span>
-                          <span>
-                            {dataAcceso.fijacionCinta
-                              ? `SÍ (${dataAcceso.fijacionCintaTipo || 'Estándar'})`
-                              : 'NO'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="font-bold text-slate-600 block">Adherencia:</span>
-                          <span>{dataAcceso.fijacionAdherencia || '-'}</span>
-                        </div>
-                        <div>
-                          <span className="font-bold text-slate-600 block">Infusión:</span>
-                          <span>{dataAcceso.infusionType || '-'}</span>
-                        </div>
+
+                        {dataAcceso.observaciones && (
+                          <div className="p-2.5 rounded-lg bg-sky-50/60 border border-sky-100 text-slate-800 space-y-0.5">
+                            <span className="font-bold text-[11px] text-sky-900 block">
+                              Observaciones adicionales:
+                            </span>
+                            <p className="italic text-xs text-slate-700">{dataAcceso.observaciones}</p>
+                          </div>
+                        )}
                       </div>
                     )}
 
+                    {/* CASO 2: Sin Acceso Periférico o Alternativo */}
                     {isAcceso && dataAcceso && !dataAcceso.tieneAcceso && (
-                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/60 text-slate-700">
-                        <div>
-                          <span className="font-bold text-slate-600 block">Situación / Acceso:</span>
-                          <span>
-                            {dataAcceso.tipoAccesoAlternativo === 'acceso_central'
-                              ? `Acceso Central (${dataAcceso.accesoCentralUbicacion || 'S/D'})`
-                              : dataAcceso.tipoAccesoAlternativo === 'percutaneo'
-                              ? `Percutáneo (Rótulo: ${dataAcceso.tieneRotulo ? 'SÍ' : 'NO'})`
-                              : dataAcceso.motivoAusente || dataAcceso.tipoAccesoAlternativo === 'ausente'
-                              ? `Ausente / Cama Libre (${dataAcceso.motivoAusente || 'Libre'})`
-                              : 'Ninguno / Nada'}
+                      <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-xs space-y-2.5">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                          <span className="font-bold text-slate-800 text-xs">
+                            Situación / Acceso Alternativo
+                          </span>
+                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                            Sin Acceso Periférico
                           </span>
                         </div>
+
+                        {dataAcceso.motivoAusente ||
+                        dataAcceso.tipoAccesoAlternativo === 'ausente' ? (
+                          <div className="p-2 rounded-md bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                            <span>
+                              Paciente Ausente / Cama: {dataAcceso.motivoAusente || 'Libre'}
+                            </span>
+                          </div>
+                        ) : dataAcceso.tipoAccesoAlternativo === 'acceso_central' ? (
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-slate-700">Tipo: Acceso Central</span>
+                              <span className="font-extrabold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                                Ubicación: {dataAcceso.accesoCentralUbicacion || 'S/D'}
+                              </span>
+                            </div>
+                          </div>
+                        ) : dataAcceso.tipoAccesoAlternativo === 'percutaneo' ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-slate-700">
+                                Tipo: Catéter Percutáneo
+                              </span>
+                              <span
+                                className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${
+                                  dataAcceso.tieneRotulo
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                    : 'bg-rose-100 text-rose-800 border border-rose-200'
+                                }`}
+                              >
+                                Rótulo: {dataAcceso.tieneRotulo ? 'SÍ (Colocado)' : 'NO'}
+                              </span>
+                            </div>
+
+                            {dataAcceso.tieneRotulo && (
+                              <div className="grid grid-cols-3 gap-1 pt-1 border-t border-slate-100">
+                                {percutaneoRotuloAuditoria.map((it) => (
+                                  <span
+                                    key={it.label}
+                                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center justify-between border ${
+                                      it.ok
+                                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                        : 'bg-slate-100 text-slate-600 border-slate-200'
+                                    }`}
+                                  >
+                                    <span>{it.label}</span>
+                                    {it.ok ? (
+                                      <Check className="w-3 h-3 text-emerald-600" />
+                                    ) : (
+                                      <X className="w-3 h-3 text-slate-600" />
+                                    )}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-slate-600 font-semibold">
+                            Sin vía periférica ni accesos activos registrados.
+                          </div>
+                        )}
+
+                        {dataAcceso.observaciones && (
+                          <div className="p-2 rounded-md bg-slate-50 border border-slate-200 text-slate-800 text-xs">
+                            <span className="font-bold block text-[11px] text-slate-700">
+                              Observaciones:
+                            </span>
+                            <span className="italic">{dataAcceso.observaciones}</span>
+                          </div>
+                        )}
                       </div>
                     )}
 
-                    {isAcceso && dataAcceso?.observaciones && (
-                      <div className="pt-1 border-t border-slate-200/60 text-slate-700">
-                        <span className="font-bold text-slate-600 block">Observaciones:</span>
-                        <span className="italic text-slate-800">{dataAcceso.observaciones}</span>
-                      </div>
-                    )}
-
+                    {/* CASO 3: Úlcera por Presión (UPP) Activa */}
                     {!isAcceso && dataUpp && dataUpp.tieneUpp && (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 border-t border-slate-200/60 text-slate-700">
-                        <div>
-                          <span className="font-bold text-slate-600 block">Fecha Ingreso:</span>
-                          <span>{dataUpp.fechaIngreso || '-'}</span>
-                        </div>
-                        <div>
-                          <span className="font-bold text-slate-600 block">Área Cerrada:</span>
-                          <span>
-                            {dataUpp.pasoAreaCerrada
-                              ? `SÍ${dataUpp.areaCerradaCual ? ` (${dataUpp.areaCerradaCual})` : ''}`
-                              : 'NO'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="font-bold text-slate-600 block">Cantidad:</span>
-                          <span>{dataUpp.cuantas || 1}</span>
-                        </div>
-                        <div>
-                          <span className="font-bold text-slate-600 block">Grados:</span>
-                          <span>{gradosUpp ? `Grado ${gradosUpp}` : '-'}</span>
-                        </div>
-                        <div>
-                          <span className="font-bold text-slate-600 block">Braden:</span>
-                          <span>{dataUpp.escalaBraden} puntos</span>
-                        </div>
-                        <div>
-                          <span className="font-bold text-slate-600 block">Tratamiento:</span>
-                          <span>
-                            {Array.isArray(dataUpp.tratamientos) && dataUpp.tratamientos.length > 0
-                              ? dataUpp.tratamientos.join(', ')
-                              : (dataUpp.tipoTratamiento || '-')}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="font-bold text-slate-600 block">Dispositivo Apoyo:</span>
-                          <span>
-                            {dataUpp.tieneDispositivoApoyo
-                              ? [
-                                  dataUpp.dispositivoAro && 'Aro',
-                                  dataUpp.dispositivoGuantesAgua && 'Guantes agua',
-                                  dataUpp.dispositivoOtro,
+                      <div className="space-y-2.5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                          {/* A. Ingreso y Procedencia */}
+                          <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-xs space-y-2">
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                              <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                                <Calendar className="w-3.5 h-3.5 text-rose-700" />
+                                Ingreso y Procedencia
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div>
+                                <span className="text-[11px] font-bold text-slate-600 block">
+                                  Fecha Ingreso:
+                                </span>
+                                <span className="font-semibold text-slate-800">
+                                  {dataUpp.fechaIngreso || '-'}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[11px] font-bold text-slate-600 block">
+                                  Área Cerrada:
+                                </span>
+                                <span className="font-semibold text-slate-800">
+                                  {dataUpp.pasoAreaCerrada
+                                    ? `SÍ ${
+                                        dataUpp.areaCerradaCual
+                                          ? `(${dataUpp.areaCerradaCual})`
+                                          : ''
+                                      }`
+                                    : 'NO'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* B. Lesión, Ubicación y Grados */}
+                          <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-xs space-y-2">
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                              <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                                <Bandage className="w-3.5 h-3.5 text-rose-700" />
+                                Lesiones y Ubicación
+                              </span>
+                              <span className="text-[10px] font-extrabold text-rose-800 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                                {dataUpp.cuantas || 1}{' '}
+                                {dataUpp.cuantas === 1 ? 'lesión' : 'lesiones'}
+                              </span>
+                            </div>
+
+                            <div>
+                              <span className="text-[11px] font-bold text-slate-600 block mb-1">
+                                Ubicación anatómica:
+                              </span>
+                              <div className="flex flex-wrap gap-1.5">
+                                {ubicacionesUppList.length > 0 ? (
+                                  ubicacionesUppList.map((ub) => (
+                                    <span
+                                      key={ub}
+                                      className="text-[11px] font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200"
+                                    >
+                                      {ub}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-slate-600 italic text-[11px]">
+                                    No especificada
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-slate-600">Grados:</span>
+                              <span className="text-[11px] font-extrabold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                                {gradosUpp ? `Grado ${gradosUpp}` : 'Sin grado'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* C. Tratamiento y Dispositivos de Apoyo */}
+                          <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-xs space-y-2">
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                              <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                                <LifeBuoy className="w-3.5 h-3.5 text-sky-700" />
+                                Tratamiento y Apoyo
+                              </span>
+                              <span
+                                className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${
+                                  dataUpp.tieneTratamiento
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                    : 'bg-slate-100 text-slate-600 border border-slate-200'
+                                }`}
+                              >
+                                {dataUpp.tieneTratamiento ? 'Tratamiento Activo' : 'Sin Tratamiento'}
+                              </span>
+                            </div>
+
+                            <div>
+                              <span className="text-[11px] font-bold text-slate-600 block mb-0.5">
+                                Curación / Insumos:
+                              </span>
+                              <span className="text-xs text-slate-800 font-semibold block">
+                                {Array.isArray(dataUpp.tratamientos) &&
+                                dataUpp.tratamientos.length > 0
+                                  ? dataUpp.tratamientos.join(', ')
+                                  : dataUpp.tipoTratamiento || '-'}
+                              </span>
+                            </div>
+
+                            <div className="pt-1.5 border-t border-slate-100">
+                              <span className="text-[11px] font-bold text-slate-600 block mb-0.5">
+                                Dispositivo de apoyo:
+                              </span>
+                              <span className="text-xs text-slate-800 font-semibold block">
+                                {dataUpp.tieneDispositivoApoyo
+                                  ? [
+                                      dataUpp.dispositivoAro && 'Aro',
+                                      dataUpp.dispositivoGuantesAgua && 'Guantes con agua',
+                                      dataUpp.dispositivoOtro,
+                                    ]
+                                      .filter(Boolean)
+                                      .join(', ') || 'SÍ'
+                                  : 'NO'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* D. Braden, Nutrición y Colchón */}
+                          <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-xs space-y-2">
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                              <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                                <HeartPulse className="w-3.5 h-3.5 text-rose-700" />
+                                Braden, Nutrición y Cuidados
+                              </span>
+                              {bradenInfo && (
+                                <span
+                                  className={`text-[10px] font-extrabold px-2 py-0.5 rounded border ${bradenInfo.color}`}
+                                >
+                                  Braden: {dataUpp.escalaBraden} pts · {bradenInfo.label}
+                                </span>
+                              )}
+                            </div>
+
+                            <div>
+                              <span className="text-[11px] font-bold text-slate-600 block mb-0.5">
+                                Nutrición:
+                              </span>
+                              <span className="text-xs text-slate-800 font-semibold block">
+                                {[
+                                  (dataUpp.nutricionOral || dataUpp.nutricion === 'oral') && 'Oral',
+                                  (dataUpp.nutricionNpt || dataUpp.nutricion === 'NPT') && 'NPT',
+                                  (dataUpp.nutricionEnteralSn ||
+                                    dataUpp.nutricion === 'enteral SN') &&
+                                    'Enteral SN',
+                                  (dataUpp.nutricionEnteralBg ||
+                                    dataUpp.nutricion === 'enteral BG') &&
+                                    'Enteral BG',
                                 ]
                                   .filter(Boolean)
-                                  .join(', ') || 'SÍ'
-                              : 'NO'}
+                                  .join(', ') ||
+                                  dataUpp.nutricion ||
+                                  '-'}
+                              </span>
+                            </div>
+
+                            <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-slate-600">
+                                Colchón anti-escaras:
+                              </span>
+                              <span
+                                className={`text-[11px] font-extrabold px-2 py-0.5 rounded ${
+                                  dataUpp.colchonAntiEscaras
+                                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                    : 'bg-slate-100 text-slate-600 border border-slate-200'
+                                }`}
+                              >
+                                {dataUpp.colchonAntiEscaras ? 'SÍ' : 'NO'}
+                              </span>
+                            </div>
+
+                            {dataUpp.observacionesColchon && (
+                              <div className="text-[11px] text-slate-600 italic bg-slate-50 p-1.5 rounded border border-slate-200">
+                                Obs. colchón: {dataUpp.observacionesColchon}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {dataUpp.observaciones && (
+                          <div className="p-2.5 rounded-lg bg-rose-50/60 border border-rose-100 text-slate-800 space-y-0.5">
+                            <span className="font-bold text-[11px] text-rose-900 block">
+                              Observaciones adicionales:
+                            </span>
+                            <p className="italic text-xs text-slate-700">{dataUpp.observaciones}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* CASO 4: Sin UPP / Piel Íntegra */}
+                    {!isAcceso && dataUpp && !dataUpp.tieneUpp && (
+                      <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-slate-800 text-xs">
+                            Evaluación de Piel
+                          </span>
+                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            {dataUpp.motivoAusente
+                              ? `Cama / Paciente: ${dataUpp.motivoAusente}`
+                              : 'Piel Íntegra / Sin UPP'}
                           </span>
                         </div>
-                        <div>
-                          <span className="font-bold text-slate-600 block">Nutrición:</span>
-                          <span>
-                            {[
-                              (dataUpp.nutricionOral || dataUpp.nutricion === 'oral') && 'Oral',
-                              (dataUpp.nutricionNpt || dataUpp.nutricion === 'NPT') && 'NPT',
-                              (dataUpp.nutricionEnteralSn || dataUpp.nutricion === 'enteral SN') && 'Enteral SN',
-                              (dataUpp.nutricionEnteralBg || dataUpp.nutricion === 'enteral BG') && 'Enteral BG',
-                            ].filter(Boolean).join(', ') || dataUpp.nutricion || '-'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="font-bold text-slate-600 block">Colchón Anti-escaras:</span>
-                          <span>{dataUpp.colchonAntiEscaras ? 'SÍ' : 'NO'}</span>
-                        </div>
+                        {dataUpp.observaciones && (
+                          <div className="text-xs text-slate-700 italic bg-slate-50 p-2 rounded border border-slate-200">
+                            Observaciones: {dataUpp.observaciones}
+                          </div>
+                        )}
                       </div>
                     )}
 

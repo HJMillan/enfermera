@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { X, CheckCircle2, Download, Award, AlertCircle, Mail, Send, RefreshCw } from 'lucide-react';
+import { X, CheckCircle2, Download, Award, AlertCircle, Mail, Send, RefreshCw, Trash2, Sun } from 'lucide-react';
 import type { StoredRecord, AccesoPerifericoForm, UppForm } from '../../types/form';
-import { exportRecordsToCSV, getNotificationEmails } from '../../services/storageService';
+import { exportRecordsToCSV, getNotificationEmails, clearStoredRecords } from '../../services/storageService';
 import { requestShiftSummaryEmail } from '../../services/webhookService';
 import { haptics } from '../../utils/haptics';
 
@@ -9,12 +9,14 @@ interface ShiftSummaryModalProps {
   isOpen: boolean;
   onClose: () => void;
   records: StoredRecord[];
+  onShiftReset?: () => void;
 }
 
 export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
   isOpen,
   onClose,
   records,
+  onShiftReset,
 }) => {
   const [isSending, setIsSending] = useState(false);
   const [sendStatus, setSendStatus] = useState<{ type: 'idle' | 'success' | 'error'; message: string }>({
@@ -187,6 +189,39 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
                   <AlertCircle className="w-4 h-4 shrink-0 text-rose-700" />
                 )}
                 <span>{sendStatus.message}</span>
+              </div>
+            )}
+
+            {sendStatus.type === 'success' && (
+              <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-[var(--radius-sm)] space-y-2 text-xs">
+                <div className="flex items-center gap-2 text-emerald-950 font-extrabold">
+                  <Sun className="w-4 h-4 text-amber-500 shrink-0" />
+                  <span>Jornada finalizada · Planilla lista para el próximo día</span>
+                </div>
+                <p className="text-emerald-800 text-[11px]">
+                  El reporte diario se despachó a Google Sheets y a las casillas de correo. Puedes descargar el CSV de respaldo y reiniciar la planilla para comenzar limpio mañana.
+                </p>
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          '¿Deseas descargar el archivo CSV de respaldo y limpiar los registros de este turno para comenzar la ronda de mañana?'
+                        )
+                      ) {
+                        exportRecordsToCSV();
+                        clearStoredRecords();
+                        onShiftReset?.();
+                        onClose();
+                      }
+                    }}
+                    className="w-full py-2 px-3 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold rounded-[var(--radius-sm)] text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-98 transition-all cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Descargar Respaldo CSV y Comenzar Nuevo Día</span>
+                  </button>
+                </div>
               </div>
             )}
 

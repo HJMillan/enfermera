@@ -431,6 +431,7 @@ export default function App() {
           isOpen={isShiftModalOpen}
           onClose={() => setIsShiftModalOpen(false)}
           records={records}
+          onShiftReset={reloadData}
         />
       )}
 

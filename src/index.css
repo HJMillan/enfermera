@@ -10,12 +10,12 @@
     --app-primary-light: #e0f2fe;
     --app-success: #10b981;
     --app-danger: #ef4444;
-    --header-height: 57px;
+    --header-height: calc(57px + env(safe-area-inset-top, 0px));
   }
 
   @media (min-width: 768px) {
     :root {
-      --header-height: 65px;
+      --header-height: calc(65px + env(safe-area-inset-top, 0px));
     }
   }
 
@@ -25,6 +25,7 @@
     -webkit-user-select: none;
     -webkit-touch-callout: none;
     touch-action: manipulation;
+    overscroll-behavior-y: none;
   }
 
   body {
@@ -33,10 +34,10 @@
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif;
     min-height: 100vh;
     min-height: 100dvh;
-    padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: max(env(safe-area-inset-bottom, 24px), 24px);
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: none;
   }
 
   /* CRÍTICO PARA IPHONE / SAFARI iOS:

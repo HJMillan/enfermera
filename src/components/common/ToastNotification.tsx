@@ -33,7 +33,8 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({ toast, onC
   return (
     <aside
       aria-label="Notificaciones"
-      className="fixed top-3 left-3 right-3 md:left-auto md:right-4 md:max-w-md z-50 animate-fade-in"
+      className="fixed left-3 right-3 md:left-auto md:right-4 md:max-w-md z-50 animate-fade-in"
+      style={{ top: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
     >
       <div
         className={`flex items-center gap-3 p-3 rounded-2xl shadow-2xl border text-xs md:text-sm backdrop-blur-md ${
