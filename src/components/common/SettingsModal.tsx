@@ -7,6 +7,7 @@ import {
   getNotificationEmails,
   setNotificationEmails,
 } from '../../services/storageService';
+import { APP_VERSION, SCRIPT_VERSION } from '../../config/version';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -111,7 +112,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
         <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
           <div className="flex items-center gap-2">
             <Settings className="w-5 h-5 text-sky-700" />
-            <h2 className="font-bold text-slate-900 text-lg">Configuración de Planilla</h2>
+            <div>
+              <h2 className="font-bold text-slate-900 text-lg">Configuración de Planilla</h2>
+              <p className="text-[11px] font-semibold text-slate-500">
+                App v{APP_VERSION} · script esperado v{SCRIPT_VERSION}
+              </p>
+            </div>
           </div>
           <button
             type="button"
@@ -205,7 +211,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                 <li>Pega el código y haz clic en <b>Implementar &gt; Nueva implementación</b>.</li>
                 <li>Selecciona tipo <b>Aplicación web</b> con acceso <b>Cualquier usuario</b>.</li>
                 <li>Copia la URL de la aplicación web y pégala aquí arriba.</li>
-                <li>Para ver <b>Estadísticas</b>, después de pegar el Code.gs actualizado volvé a <b>Implementar → Nueva versión</b>. Sin eso la pestaña no puede leer el archivo.</li>
+                <li>Para ver <b>Números</b>, después de pegar el Code.gs v{SCRIPT_VERSION} volvé a <b>Implementar → Nueva versión</b>. Sin eso la pestaña no puede leer el archivo.</li>
               </ol>
             )}
           </div>
@@ -258,21 +264,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
         </div>
 
         {/* Footer */}
-        <div className="p-3 bg-slate-50 border-t border-slate-100 flex gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 py-2.5 rounded-[var(--radius-sm)] border border-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-100 shadow-[var(--shadow-rest)] hover:shadow-[var(--shadow-hover)] transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            className="flex-1 py-2.5 rounded-[var(--radius-sm)] bg-sky-700 text-white font-bold text-sm shadow-[var(--shadow-hover)] hover:bg-sky-800 transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] cursor-pointer"
-          >
-            Guardar Configuración
-          </button>
+        <div className="p-3 bg-slate-50 border-t border-slate-100 space-y-2">
+          <p className="text-[10px] font-semibold text-slate-500 text-center">
+            Planilla Enfermera v{APP_VERSION}
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-[var(--radius-sm)] border border-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-100 shadow-[var(--shadow-rest)] hover:shadow-[var(--shadow-hover)] transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              className="flex-1 py-2.5 rounded-[var(--radius-sm)] bg-sky-700 text-white font-bold text-sm shadow-[var(--shadow-hover)] hover:bg-sky-800 transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] cursor-pointer"
+            >
+              Guardar Configuración
+            </button>
+          </div>
         </div>
       </div>
     </div>

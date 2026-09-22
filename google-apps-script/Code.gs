@@ -1,6 +1,6 @@
 /**
  * PLANILLA ENFERMERA - Google Apps Script (Producción)
- * Versión: 2026-09-22 — GET_STATS JSONP + KPIs alineados al recorte
+ * Versión: 1.1.0 — Números (GET_STATS JSONP) + stamp de versión en ping/stats
  *
  * Endpoint Webhook para inserción automática en Google Sheets,
  * estadísticas de lectura del archivo y reporte de Cierre de Turno.
@@ -15,6 +15,9 @@
 // Si el script está vinculado al Sheet (Extensiones > Apps Script), dejar vacío ('').
 // Si se utiliza como script independiente (standalone), colocar el ID de la hoja de cálculo:
 var SPREADSHEET_ID = '';
+
+/** Debe coincidir con SCRIPT_VERSION en src/config/version.ts */
+var SCRIPT_VERSION = '1.1.0';
 
 var DEFAULT_RECIPIENTS = ['jesusmillan86@gmail.com', 'pamelaestua91@gmail.com'];
 
@@ -208,6 +211,7 @@ function doGet(e) {
 
     return respondPayload({
       status: 'online',
+      version: SCRIPT_VERSION,
       service: 'Planilla Enfermera Webhook Activo (Producción)',
       spreadsheet: ssTitle,
       destinatarios: DEFAULT_RECIPIENTS,
@@ -222,6 +226,9 @@ function doGet(e) {
 }
 
 function respondPayload(payload, callback) {
+  if (payload && typeof payload === 'object' && !payload.version) {
+    payload.version = SCRIPT_VERSION;
+  }
   var json = JSON.stringify(payload);
   if (callback && /^[A-Za-z_][A-Za-z0-9_]*$/.test(callback)) {
     return ContentService

@@ -86,6 +86,7 @@ export interface StatsPayload {
   status: 'success' | 'error' | 'online';
   message?: string;
   generatedAt?: string;
+  version?: string;
   from?: string | null;
   to?: string | null;
   sector?: string | null;

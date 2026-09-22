@@ -17,6 +17,7 @@ import { SECTORS } from '../../config/sectorConfig';
 import { getCurrentDateISO } from '../../utils/dateUtils';
 import { getStoredWebhookUrl } from '../../services/storageService';
 import { fetchSheetStatistics } from '../../services/webhookService';
+import { APP_VERSION, SCRIPT_VERSION } from '../../config/version';
 import type { StatsAlerta, StatsFilters, StatsPayload, StatsPreset, StatsRonda } from '../../types/stats';
 import { CountTile, Donut, HBar, SectionHelp, StackedBar, pct } from './StatsCharts';
 
@@ -565,9 +566,23 @@ export const StatsView: React.FC<StatsViewProps> = ({ hasWebhook }) => {
         <>
           <p className="text-[11px] text-slate-500 font-medium px-1">
             {showingStale ? 'Última lectura correcta' : 'Archivo leído'}
-            {data.generatedAt ? ` ${data.generatedAt} hs` : ''}
+            {data.generatedAt ? ` ${data.generatedAt}` : ''}
             {loading ? ' · actualizando…' : ''}
+            {' · '}app v{APP_VERSION}
+            {data.version ? ` · script v${data.version}` : ' · script sin versión'}
           </p>
+          {data.version && data.version !== SCRIPT_VERSION && (
+            <p className="text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-[var(--radius-sm)] px-3 py-2">
+              El script del Sheet es v{data.version} y esta app espera v{SCRIPT_VERSION}. Pegá el Code.gs
+              actualizado e implementá una nueva versión.
+            </p>
+          )}
+          {!data.version && (
+            <p className="text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-[var(--radius-sm)] px-3 py-2">
+              El script no informa versión. Pegá el Code.gs v{SCRIPT_VERSION} e implementá una nueva versión
+              para Números.
+            </p>
+          )}
 
           {lectura && (
             <div className="bg-sky-50 border border-sky-100 rounded-[var(--radius-md)] px-3.5 py-3">

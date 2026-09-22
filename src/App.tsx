@@ -12,6 +12,7 @@ import {
   deleteRecordLocally,
 } from './services/storageService';
 import { MAX_BEDS } from './config/sectorConfig';
+import { APP_VERSION } from './config/version';
 
 import { submitPatientRecord } from './services/webhookService';
 import { PatientHeader } from './components/common/PatientHeader';
@@ -217,7 +218,9 @@ export default function App() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="font-extrabold text-slate-900 text-base leading-tight">Planilla Enfermera</h1>
-              <span className="text-[10px] font-bold bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded-md leading-none">v1.0.0</span>
+              <span className="text-[10px] font-bold bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded-md leading-none">
+                v{APP_VERSION}
+              </span>
             </div>
             <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
               <span className="font-medium text-slate-700">Turno 8:00 a 16:00 hs</span>

@@ -1,9 +1,9 @@
 /**
  * PLANILLA ENFERMERA - Service Worker (Offline First)
- * Permite instalación PWA y funcionamiento continuo en zonas sin conexión hospitalaria.
+ * Caché v1.1.0 — al publicar, bump CACHE_NAME junto con APP_VERSION.
  */
 
-const CACHE_NAME = 'planilla-enfermera-v2';
+const CACHE_NAME = 'planilla-enfermera-v1.1.0';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
