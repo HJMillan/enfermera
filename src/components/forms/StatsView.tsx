@@ -380,7 +380,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ hasWebhook }) => {
               Estadísticas de la ronda
             </h2>
             <p className="text-[11px] text-slate-600 font-medium">
-              Números de la planilla, en lenguaje de ronda.
+              Datos del archivo de la ronda.
             </p>
             <p className="text-[11px] text-slate-500 font-medium">{summary}</p>
           </div>
@@ -580,13 +580,13 @@ export const StatsView: React.FC<StatsViewProps> = ({ hasWebhook }) => {
           {!data.version && (
             <p className="text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-[var(--radius-sm)] px-3 py-2">
               El script no informa versión. Pegá el Code.gs v{SCRIPT_VERSION} e implementá una nueva versión
-              para Números.
+              para Estadísticas.
             </p>
           )}
 
           {lectura && (
             <div className="bg-sky-50 border border-sky-100 rounded-[var(--radius-md)] px-3.5 py-3">
-              <p className="text-[11px] font-bold text-sky-800 uppercase tracking-wide mb-1">En criollo</p>
+              <p className="text-[11px] font-bold text-sky-800 uppercase tracking-wide mb-1">Resumen</p>
               <p className="text-sm font-semibold text-sky-950 leading-relaxed">{lectura}</p>
             </div>
           )}

@@ -69,7 +69,7 @@ export const ModuleTabs: React.FC<ModuleTabsProps> = ({
         }`}
       >
         <BarChart3 className={`w-4 h-4 shrink-0 ${activeTab === 'STATS' ? 'text-indigo-700' : 'text-slate-600'}`} />
-        <span className="truncate">Números</span>
+        <span className="truncate">Estadísticas</span>
       </button>
 
       <button

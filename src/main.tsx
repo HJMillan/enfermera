@@ -12,16 +12,20 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 )
 
-// Registro del Service Worker para PWA y funcionamiento offline
-if ('serviceWorker' in navigator && !window.location.host.startsWith('127.0.0.1:')) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('/sw.js')
-      .then((reg) => {
-        console.log('Service Worker registrado con éxito:', reg.scope);
-      })
-      .catch((err) => {
-        console.warn('Error al registrar Service Worker:', err);
-      });
-  });
+// Service Worker solo en el host publicado. En localhost Vite queda tapado por la caché PWA.
+if ('serviceWorker' in navigator) {
+  const host = window.location.hostname;
+  const isLocalDev = host === 'localhost' || host === '127.0.0.1';
+  if (!isLocalDev) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker
+        .register('/sw.js')
+        .then((reg) => {
+          console.log('Service Worker registrado con éxito:', reg.scope);
+        })
+        .catch((err) => {
+          console.warn('Error al registrar Service Worker:', err);
+        });
+    });
+  }
 }

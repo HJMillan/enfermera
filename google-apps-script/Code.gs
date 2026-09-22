@@ -1,6 +1,6 @@
 /**
  * PLANILLA ENFERMERA - Google Apps Script (Producción)
- * Versión: 1.1.0 — Números (GET_STATS JSONP) + stamp de versión en ping/stats
+ * Versión: 1.1.0 — Estadísticas (GET_STATS JSONP) + stamp de versión en ping/stats
  *
  * Endpoint Webhook para inserción automática en Google Sheets,
  * estadísticas de lectura del archivo y reporte de Cierre de Turno.

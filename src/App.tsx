@@ -331,8 +331,8 @@ export default function App() {
                     <BarChart3 className="w-4 h-4" />
                   </div>
                   <div>
-                    <span className="font-extrabold text-sm block leading-tight">Números</span>
-                    <span className="text-[11px] text-slate-600">Cómo está la ronda, en criollo</span>
+                    <span className="font-extrabold text-sm block leading-tight">Estadísticas</span>
+                    <span className="text-[11px] text-slate-600">Resumen de la ronda</span>
                   </div>
                 </div>
               </button>
