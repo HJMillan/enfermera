@@ -1,8 +1,9 @@
 /**
- * PLANILLA ENFERMERA - Google Apps Script (Versión de Producción Actualizada)
- * 
- * Endpoint Webhook para inserción automática en Google Sheets y
- * despacho de reporte de Cierre de Turno por Correo Electrónico.
+ * PLANILLA ENFERMERA - Google Apps Script (Producción)
+ * Versión: 2026-09-22 — GET_STATS JSONP + KPIs alineados al recorte
+ *
+ * Endpoint Webhook para inserción automática en Google Sheets,
+ * estadísticas de lectura del archivo y reporte de Cierre de Turno.
  * 
  * DESTINATARIOS PREDETERMINADOS:
  * - jesusmillan86@gmail.com
@@ -183,25 +184,51 @@ function doPost(e) {
 }
 
 /**
- * Health check para peticiones GET
+ * Health check y lectura de estadísticas (JSON o JSONP).
+ * Estadísticas: GET ?action=GET_STATS&callback=peStats_xxx&from=yyyy-MM-dd&to=yyyy-MM-dd
  */
-function doGet() {
-  var ss = null;
-  var ssTitle = 'No vinculado';
-  try {
-    ss = getSpreadsheet();
-    ssTitle = ss.getName();
-  } catch (e) {
-    ssTitle = 'Error: ' + e.message;
-  }
+function doGet(e) {
+  var params = e && e.parameter ? e.parameter : {};
+  var action = String(params.action || '').toUpperCase();
+  var callback = String(params.callback || '');
 
-  return jsonResponse({ 
-    status: 'online', 
-    service: 'Planilla Enfermera Webhook Activo (Producción)',
-    spreadsheet: ssTitle,
-    destinatarios: DEFAULT_RECIPIENTS,
-    servidores: 'Google Apps Script / V8 Engine'
-  });
+  try {
+    if (action === 'GET_STATS') {
+      return respondPayload(buildStatistics(params), callback);
+    }
+
+    var ss = null;
+    var ssTitle = 'No vinculado';
+    try {
+      ss = getSpreadsheet();
+      ssTitle = ss.getName();
+    } catch (err) {
+      ssTitle = 'Error: ' + err.message;
+    }
+
+    return respondPayload({
+      status: 'online',
+      service: 'Planilla Enfermera Webhook Activo (Producción)',
+      spreadsheet: ssTitle,
+      destinatarios: DEFAULT_RECIPIENTS,
+      servidores: 'Google Apps Script / V8 Engine'
+    }, callback);
+  } catch (error) {
+    return respondPayload({
+      status: 'error',
+      message: error.toString()
+    }, callback);
+  }
+}
+
+function respondPayload(payload, callback) {
+  var json = JSON.stringify(payload);
+  if (callback && /^[A-Za-z_][A-Za-z0-9_]*$/.test(callback)) {
+    return ContentService
+      .createTextOutput(callback + '(' + json + ')')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return jsonResponse(payload);
 }
 
 /**
@@ -750,4 +777,628 @@ function menuCrearDisparadorDiario() {
 
 function verificarYEnviarPendientesAutomatico() {
   enviarReporteTurno(DEFAULT_RECIPIENTS);
+}
+
+// ---------------------------------------------------------------------------
+// ESTADÍSTICAS (lectura del archivo, no de la sesión del celular)
+// ---------------------------------------------------------------------------
+
+var SECTOR_ROOM_CONFIG = {
+  'PB': { min: 1, max: 8, exclusions: [] },
+  '1° Piso': { min: 101, max: 110, exclusions: [105, 106] },
+  'Maternidad': { min: 242, max: 261, exclusions: [252, 253, 254, 255, 256, 257, 258, 259] },
+  'A': { min: 230, max: 236, exclusions: [] },
+  'B': { min: 201, max: 215, exclusions: [] },
+  'C': { min: 237, max: 256, exclusions: [242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252] },
+  'D': { min: 216, max: 229, exclusions: [] },
+  'E': { min: 262, max: 277, exclusions: [] }
+};
+
+var STATS_SECTORS = ['PB', '1° Piso', 'Maternidad', 'A', 'B', 'C', 'D', 'E'];
+
+var SPECIAL_BED_STATUSES = ['Libre', 'Quimio', 'Quirófano', 'Diálisis', 'Estudio / Rayos', 'Traslado'];
+
+var V = {
+  fecha: 0, sector: 1, hab: 2, cama: 3, hc: 4, enf: 5, aux: 6,
+  accesoSi: 7, accesoNo: 8, tipoAlt: 9,
+  msd: 12, msi: 13, mii: 14, mid: 15,
+  rotulo: 16, rotFecha: 17, rotNombre: 18, rotLegajo: 19, rotEnf: 20, rotTurno: 21, rotAbb: 22,
+  visSi: 23, visNo: 24, adherencia: 31,
+  infiltracion: 34, eritema: 35, retorno: 36, infusion: 37
+};
+
+var U = {
+  fecha: 0, sector: 1, hab: 2, cama: 3, hc: 4, enf: 5, aux: 6,
+  areaCerrada: 8, uppSi: 9, uppNo: 10,
+  sacra: 12, talon: 13, gluteo: 14, posterior: 15, ubicOtro: 16,
+  gradoI: 17, gradoII: 18, gradoIII: 19, gradoIV: 20,
+  tratamiento: 21, tipoTrat: 22,
+  disp: 24, aro: 25, guantes: 26, dispOtro: 27,
+  braden: 28, nutOral: 29, nutNpt: 30, nutSn: 31, nutBg: 32,
+  colchonSi: 33, colchonNo: 34, obs: 35
+};
+
+function buildStatistics(params) {
+  var fromIso = String(params.from || '').trim();
+  var toIso = String(params.to || '').trim();
+  var sectorFilter = String(params.sector || '').trim();
+  var ronda = String(params.ronda || 'ambas').toLowerCase();
+  var onlyEvaluables = isFlag(params.evaluables);
+  var onlyAlertas = isFlag(params.alertas);
+  var onlyConVia = isFlag(params.conVia);
+  var onlyRotuloInc = String(params.rotulo || '').toLowerCase() === 'incompleto';
+  var onlyConUpp = isFlag(params.conUpp);
+  var onlyBradenAlto = String(params.braden || '').toLowerCase() === 'alto';
+
+  var loadVias = ronda !== 'upp';
+  var loadUpp = ronda !== 'vias';
+
+  var ss = getSpreadsheet();
+  var viasRaw = loadVias ? readSheetRows(ss, 'Acceso Periférico') : [];
+  var uppRaw = loadUpp ? readSheetRows(ss, 'UPP') : [];
+
+  var viasDated = filterByDateAndSector(viasRaw, fromIso, toIso, sectorFilter, V.fecha, V.sector, V.hab, V.cama);
+  var uppDated = filterByDateAndSector(uppRaw, fromIso, toIso, sectorFilter, U.fecha, U.sector, U.hab, U.cama);
+
+  var viasLast = lastRowByBed(viasDated, V.fecha, V.sector, V.hab, V.cama);
+  var uppLast = lastRowByBed(uppDated, U.fecha, U.sector, U.hab, U.cama);
+
+  var viasEval = [];
+  var uppEval = [];
+
+  for (var i = 0; i < viasLast.length; i++) {
+    if (onlyEvaluables && isSpecialViasRow(viasLast[i])) continue;
+    viasEval.push(viasLast[i]);
+  }
+  for (var j = 0; j < uppLast.length; j++) {
+    if (onlyEvaluables && isSpecialUppRow(uppLast[j])) continue;
+    uppEval.push(uppLast[j]);
+  }
+
+  if (onlyConVia) {
+    viasEval = viasEval.filter(function (row) { return isYes(row[V.accesoSi]); });
+  }
+  if (onlyRotuloInc) {
+    viasEval = viasEval.filter(function (row) { return rotuloStatus(row) === 'incompleto'; });
+  }
+  if (onlyConUpp) {
+    uppEval = uppEval.filter(function (row) { return isYes(row[U.uppSi]); });
+  }
+  if (onlyBradenAlto) {
+    uppEval = uppEval.filter(function (row) { return bradenBand(row[U.braden]) === 'alto'; });
+  }
+  if (onlyAlertas) {
+    viasEval = viasEval.filter(function (row) { return viasAlertTipos(row).length > 0; });
+    uppEval = uppEval.filter(function (row) { return uppAlertTipos(row).length > 0; });
+  }
+
+  var noEvalVias = 0;
+  var noEvalUpp = 0;
+  for (var nv = 0; nv < viasEval.length; nv++) {
+    if (isSpecialViasRow(viasEval[nv])) noEvalVias++;
+  }
+  for (var nu = 0; nu < uppEval.length; nu++) {
+    if (isSpecialUppRow(uppEval[nu])) noEvalUpp++;
+  }
+
+  var viasStats = summarizeVias(viasEval);
+  var uppStats = summarizeUpp(uppEval);
+  var porSector = summarizeBySector(viasEval, uppEval, sectorFilter);
+  var alertasPack = collectAlertas(viasEval, uppEval, 30);
+
+  var generatedAt = Utilities.formatDate(new Date(), 'America/Argentina/Buenos_Aires', 'dd/MM/yyyy HH:mm');
+
+  return {
+    status: 'success',
+    generatedAt: generatedAt,
+    from: fromIso || null,
+    to: toIso || null,
+    sector: sectorFilter || null,
+    ronda: ronda,
+    cobertura: {
+      registrosVias: viasDated.length,
+      registrosUpp: uppDated.length,
+      viasUnicas: viasEval.length,
+      uppUnicas: uppEval.length,
+      noEvaluablesVias: noEvalVias,
+      noEvaluablesUpp: noEvalUpp,
+      capacidad: sectorCapacity(sectorFilter),
+      porSector: porSector
+    },
+    vias: viasStats,
+    upp: uppStats,
+    alertas: alertasPack.items,
+    alertasTotal: alertasPack.total
+  };
+}
+
+function isFlag(val) {
+  var s = String(val || '').toLowerCase();
+  return s === '1' || s === 'true' || s === 'si' || s === 'yes';
+}
+
+function ymdAR(d) {
+  return Utilities.formatDate(d, 'America/Argentina/Buenos_Aires', 'yyyy-MM-dd');
+}
+
+function isBlankBed(row, sectorIdx, habIdx, camaIdx) {
+  return !cellStr(row, sectorIdx) || !cellStr(row, habIdx) || !cellStr(row, camaIdx);
+}
+
+function isNo(val) {
+  return String(val || '').trim().toUpperCase() === 'NO';
+}
+
+function parseStaffCount(val) {
+  if (val === '' || val == null) return null;
+  var n = Number(val);
+  if (isNaN(n) || n < 0) return null;
+  return n;
+}
+
+function applyStaff(slot, row, fechaIdx, enfIdx, auxIdx) {
+  var d = parseSheetDate(row[fechaIdx]);
+  var ts = d ? d.getTime() : 0;
+  if (slot._staffAt && ts < slot._staffAt) return;
+  if (!slot._staffAt || ts > slot._staffAt) slot._staffAt = ts;
+  var en = parseStaffCount(row[enfIdx]);
+  var ax = parseStaffCount(row[auxIdx]);
+  if (en !== null) slot.enfermeras = en;
+  if (ax !== null) slot.auxiliares = ax;
+}
+
+function publicSectorRow(slot) {
+  return {
+    sector: slot.sector,
+    viasUnicas: slot.viasUnicas,
+    viasEvaluables: slot.viasEvaluables,
+    noEvaluablesVias: slot.noEvaluablesVias,
+    uppUnicas: slot.uppUnicas,
+    capacidad: slot.capacidad,
+    conPeriferico: slot.conPeriferico,
+    alertasVia: slot.alertasVia,
+    conUpp: slot.conUpp,
+    bradenAlto: slot.bradenAlto,
+    rotuloIncompleto: slot.rotuloIncompleto,
+    enfermeras: slot.enfermeras,
+    auxiliares: slot.auxiliares
+  };
+}
+
+function parseSheetDate(val) {
+  if (Object.prototype.toString.call(val) === '[object Date]' && !isNaN(val.getTime())) {
+    return val;
+  }
+  var s = String(val || '').trim();
+  var m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{1,2}):(\d{2}))?/);
+  if (!m) return null;
+  return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]), Number(m[4] || 0), Number(m[5] || 0), 0, 0);
+}
+
+function isYes(val) {
+  return String(val || '').trim().toUpperCase() === 'SI';
+}
+
+function cellStr(row, idx) {
+  if (!row || idx >= row.length || row[idx] == null || row[idx] === '') return '';
+  var val = row[idx];
+  if (Object.prototype.toString.call(val) === '[object Date]' && !isNaN(val.getTime())) {
+    return Utilities.formatDate(val, 'America/Argentina/Buenos_Aires', 'dd/MM/yyyy HH:mm');
+  }
+  return String(val).trim();
+}
+
+function countRooms(cfg) {
+  var n = 0;
+  var ex = {};
+  var exclusions = cfg.exclusions || [];
+  for (var i = 0; i < exclusions.length; i++) ex[exclusions[i]] = true;
+  for (var r = cfg.min; r <= cfg.max; r++) {
+    if (!ex[r]) n++;
+  }
+  return n;
+}
+
+function sectorCapacity(sector) {
+  if (sector) {
+    return SECTOR_ROOM_CONFIG[sector] ? countRooms(SECTOR_ROOM_CONFIG[sector]) * 4 : 0;
+  }
+  var total = 0;
+  for (var k in SECTOR_ROOM_CONFIG) {
+    if (SECTOR_ROOM_CONFIG.hasOwnProperty(k)) {
+      total += countRooms(SECTOR_ROOM_CONFIG[k]) * 4;
+    }
+  }
+  return total;
+}
+
+function readSheetRows(ss, sheetName) {
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+  return sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+}
+
+function filterByDateAndSector(rows, fromIso, toIso, sector, fechaIdx, sectorIdx, habIdx, camaIdx) {
+  var out = [];
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    if (isBlankBed(row, sectorIdx, habIdx, camaIdx)) continue;
+    if (sector && cellStr(row, sectorIdx) !== sector) continue;
+    if (fromIso || toIso) {
+      var d = parseSheetDate(row[fechaIdx]);
+      if (!d) continue;
+      var ymd = ymdAR(d);
+      if (fromIso && ymd < fromIso) continue;
+      if (toIso && ymd > toIso) continue;
+    }
+    out.push(row);
+  }
+  return out;
+}
+
+function lastRowByBed(rows, fechaIdx, sectorIdx, habIdx, camaIdx) {
+  var map = {};
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    if (isBlankBed(row, sectorIdx, habIdx, camaIdx)) continue;
+    var key = cellStr(row, sectorIdx) + '|' + cellStr(row, habIdx) + '|' + cellStr(row, camaIdx);
+    var prev = map[key];
+    if (!prev) {
+      map[key] = row;
+      continue;
+    }
+    var dNew = parseSheetDate(row[fechaIdx]);
+    var dOld = parseSheetDate(prev[fechaIdx]);
+    if (!dOld || (dNew && dNew >= dOld)) {
+      map[key] = row;
+    }
+  }
+  var out = [];
+  for (var k in map) {
+    if (map.hasOwnProperty(k)) out.push(map[k]);
+  }
+  return out;
+}
+
+function isSpecialViasRow(row) {
+  var tipo = cellStr(row, V.tipoAlt);
+  if (!tipo) return false;
+  var low = tipo.toLowerCase();
+  if (low === 'acceso_central' || low === 'percutaneo' || low === 'nada' || low === 'ausente') {
+    if (low === 'ausente') return true;
+    return false;
+  }
+  for (var i = 0; i < SPECIAL_BED_STATUSES.length; i++) {
+    if (tipo === SPECIAL_BED_STATUSES[i] || low === SPECIAL_BED_STATUSES[i].toLowerCase()) return true;
+  }
+  if (low.indexOf('estudio') !== -1 || low.indexOf('rayos') !== -1) return true;
+  return false;
+}
+
+function isSpecialUppRow(row) {
+  var obs = cellStr(row, U.obs).toLowerCase();
+  return obs.indexOf('paciente ausente') !== -1 || obs.indexOf('cama libre:') !== -1;
+}
+
+function rotuloApplies(row) {
+  return isYes(row[V.accesoSi]) || cellStr(row, V.tipoAlt).toLowerCase() === 'percutaneo';
+}
+
+function rotuloStatus(row) {
+  if (!rotuloApplies(row)) return 'na';
+  if (!isYes(row[V.rotulo])) return 'incompleto';
+  var enfOk = isYes(row[V.rotEnf]) || isYes(row[V.rotNombre]);
+  if (isYes(row[V.rotFecha]) && enfOk && isYes(row[V.rotLegajo]) && isYes(row[V.rotTurno]) && isYes(row[V.rotAbb])) {
+    return 'completo';
+  }
+  return 'incompleto';
+}
+
+function bradenBand(val) {
+  var n = Number(val);
+  if (val === '' || val == null || isNaN(n)) return '';
+  if (n <= 12) return 'alto';
+  if (n <= 14) return 'moderado';
+  return 'bajo';
+}
+
+function viasAlertTipos(row) {
+  var tipos = [];
+  if (isYes(row[V.infiltracion])) tipos.push('Infiltración');
+  if (isYes(row[V.eritema])) tipos.push('Eritema');
+  if (rotuloStatus(row) === 'incompleto') tipos.push('Rótulo incompleto');
+  return tipos;
+}
+
+function uppAlertTipos(row) {
+  var tipos = [];
+  if (isYes(row[U.gradoIII]) || isYes(row[U.gradoIV])) tipos.push('UPP III-IV');
+  if (bradenBand(row[U.braden]) === 'alto') tipos.push('Braden alto');
+  return tipos;
+}
+
+function bump(map, key) {
+  if (!key) return;
+  map[key] = (map[key] || 0) + 1;
+}
+
+function mapToItems(map) {
+  var items = [];
+  for (var k in map) {
+    if (map.hasOwnProperty(k)) items.push({ label: k, count: map[k] });
+  }
+  items.sort(function (a, b) { return b.count - a.count; });
+  return items;
+}
+
+function summarizeVias(rows) {
+  var conPeriferico = 0;
+  var central = 0;
+  var percutaneo = 0;
+  var nada = 0;
+  var noEvaluables = 0;
+  var rotuloSi = 0;
+  var rotuloCompleto = 0;
+  var rotuloIncompleto = 0;
+  var infiltracion = 0;
+  var eritema = 0;
+  var sinRetorno = 0;
+  var noVisible = 0;
+  var adhParcial = 0;
+  var adhNula = 0;
+  var infusiones = {};
+  var ubicaciones = { MSD: 0, MSI: 0, MID: 0, MII: 0 };
+
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    var tipo = cellStr(row, V.tipoAlt).toLowerCase();
+    if (isYes(row[V.accesoSi])) {
+      conPeriferico++;
+      if (isYes(row[V.msd])) ubicaciones.MSD++;
+      if (isYes(row[V.msi])) ubicaciones.MSI++;
+      if (isYes(row[V.mid])) ubicaciones.MID++;
+      if (isYes(row[V.mii])) ubicaciones.MII++;
+      if (isYes(row[V.infiltracion])) infiltracion++;
+      if (isYes(row[V.eritema])) eritema++;
+      if (isNo(row[V.retorno])) sinRetorno++;
+      if (isYes(row[V.visNo])) noVisible++;
+      var adh = cellStr(row, V.adherencia).toLowerCase();
+      if (adh === 'parcial') adhParcial++;
+      if (adh === 'nula') adhNula++;
+      var inf = cellStr(row, V.infusion);
+      if (inf) bump(infusiones, inf.charAt(0).toUpperCase() + inf.slice(1));
+    } else if (tipo === 'acceso_central') {
+      central++;
+    } else if (tipo === 'percutaneo') {
+      percutaneo++;
+    } else if (isSpecialViasRow(row)) {
+      noEvaluables++;
+    } else {
+      nada++;
+    }
+
+    var rs = rotuloStatus(row);
+    if (rs === 'completo') {
+      rotuloSi++;
+      rotuloCompleto++;
+    } else if (rs === 'incompleto') {
+      rotuloIncompleto++;
+      if (isYes(row[V.rotulo])) rotuloSi++;
+    }
+  }
+
+  return {
+    evaluadas: rows.length,
+    conPeriferico: conPeriferico,
+    central: central,
+    percutaneo: percutaneo,
+    nada: nada,
+    noEvaluables: noEvaluables,
+    rotuloSi: rotuloSi,
+    rotuloCompleto: rotuloCompleto,
+    rotuloIncompleto: rotuloIncompleto,
+    infiltracion: infiltracion,
+    eritema: eritema,
+    sinRetorno: sinRetorno,
+    puncionNoVisible: noVisible,
+    adherenciaParcial: adhParcial,
+    adherenciaNula: adhNula,
+    infusiones: mapToItems(infusiones),
+    ubicaciones: [
+      { label: 'MSD', count: ubicaciones.MSD },
+      { label: 'MSI', count: ubicaciones.MSI },
+      { label: 'MID', count: ubicaciones.MID },
+      { label: 'MII', count: ubicaciones.MII }
+    ]
+  };
+}
+
+function summarizeUpp(rows) {
+  var conUpp = 0;
+  var noEvaluables = 0;
+  var gI = 0, gII = 0, gIII = 0, gIV = 0;
+  var bAlto = 0, bMod = 0, bBajo = 0;
+  var areaCerrada = 0;
+  var conTrat = 0;
+  var tratamientos = {};
+  var conDisp = 0;
+  var dispositivos = { Aro: 0, 'Guantes con agua': 0, Otro: 0 };
+  var colchonSi = 0;
+  var nutricion = { Oral: 0, NPT: 0, 'Enteral SN': 0, 'Enteral BG': 0 };
+  var ubicaciones = { Sacra: 0, Talón: 0, Glúteo: 0, Posterior: 0, Otra: 0 };
+
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    if (isSpecialUppRow(row)) {
+      noEvaluables++;
+      continue;
+    }
+    if (!isYes(row[U.uppSi])) continue;
+    conUpp++;
+    if (isYes(row[U.gradoI])) gI++;
+    if (isYes(row[U.gradoII])) gII++;
+    if (isYes(row[U.gradoIII])) gIII++;
+    if (isYes(row[U.gradoIV])) gIV++;
+    var band = bradenBand(row[U.braden]);
+    if (band === 'alto') bAlto++;
+    else if (band === 'moderado') bMod++;
+    else if (band === 'bajo') bBajo++;
+    var area = cellStr(row, U.areaCerrada);
+    if (isYes(row[U.areaCerrada]) || /^SI/i.test(area)) areaCerrada++;
+    if (isYes(row[U.tratamiento])) conTrat++;
+    var tipo = cellStr(row, U.tipoTrat);
+    if (tipo) {
+      var parts = tipo.split(',');
+      for (var p = 0; p < parts.length; p++) {
+        var t = parts[p].trim();
+        if (t) bump(tratamientos, t);
+      }
+    }
+    if (isYes(row[U.disp])) {
+      conDisp++;
+      if (isYes(row[U.aro])) dispositivos.Aro++;
+      if (isYes(row[U.guantes])) dispositivos['Guantes con agua']++;
+      if (cellStr(row, U.dispOtro)) dispositivos.Otro++;
+    }
+    if (isYes(row[U.colchonSi])) colchonSi++;
+    if (isYes(row[U.nutOral])) nutricion.Oral++;
+    if (isYes(row[U.nutNpt])) nutricion.NPT++;
+    if (isYes(row[U.nutSn])) nutricion['Enteral SN']++;
+    if (isYes(row[U.nutBg])) nutricion['Enteral BG']++;
+    if (isYes(row[U.sacra])) ubicaciones.Sacra++;
+    if (isYes(row[U.talon])) ubicaciones.Talón++;
+    if (isYes(row[U.gluteo])) ubicaciones.Glúteo++;
+    if (isYes(row[U.posterior])) ubicaciones.Posterior++;
+    if (cellStr(row, U.ubicOtro)) ubicaciones.Otra++;
+  }
+
+  return {
+    evaluadas: rows.length,
+    conUpp: conUpp,
+    noEvaluables: noEvaluables,
+    grados: { I: gI, II: gII, III: gIII, IV: gIV },
+    bradenAlto: bAlto,
+    bradenModerado: bMod,
+    bradenBajo: bBajo,
+    areaCerrada: areaCerrada,
+    conTratamiento: conTrat,
+    tratamientos: mapToItems(tratamientos).slice(0, 8),
+    conDispositivo: conDisp,
+    dispositivos: [
+      { label: 'Aro', count: dispositivos.Aro },
+      { label: 'Guantes con agua', count: dispositivos['Guantes con agua'] },
+      { label: 'Otro', count: dispositivos.Otro }
+    ],
+    colchonSi: colchonSi,
+    nutricion: [
+      { label: 'Oral', count: nutricion.Oral },
+      { label: 'NPT', count: nutricion.NPT },
+      { label: 'Enteral SN', count: nutricion['Enteral SN'] },
+      { label: 'Enteral BG', count: nutricion['Enteral BG'] }
+    ],
+    ubicaciones: [
+      { label: 'Sacra', count: ubicaciones.Sacra },
+      { label: 'Talón', count: ubicaciones.Talón },
+      { label: 'Glúteo', count: ubicaciones.Glúteo },
+      { label: 'Posterior', count: ubicaciones.Posterior },
+      { label: 'Otra', count: ubicaciones.Otra }
+    ]
+  };
+}
+
+function emptySectorRow(sector) {
+  return {
+    sector: sector,
+    viasUnicas: 0,
+    viasEvaluables: 0,
+    noEvaluablesVias: 0,
+    uppUnicas: 0,
+    capacidad: sectorCapacity(sector),
+    conPeriferico: 0,
+    alertasVia: 0,
+    conUpp: 0,
+    bradenAlto: 0,
+    rotuloIncompleto: 0,
+    enfermeras: 0,
+    auxiliares: 0,
+    _staffAt: 0
+  };
+}
+
+function summarizeBySector(viasRows, uppRows, sectorFilter) {
+  var list = sectorFilter ? [sectorFilter] : STATS_SECTORS.slice();
+  var map = {};
+  for (var s = 0; s < list.length; s++) {
+    map[list[s]] = emptySectorRow(list[s]);
+  }
+
+  for (var i = 0; i < viasRows.length; i++) {
+    var row = viasRows[i];
+    var sec = cellStr(row, V.sector);
+    if (!map[sec]) map[sec] = emptySectorRow(sec);
+    var slot = map[sec];
+    slot.viasUnicas++;
+    if (isSpecialViasRow(row)) {
+      slot.noEvaluablesVias++;
+    } else {
+      slot.viasEvaluables++;
+      if (isYes(row[V.accesoSi])) slot.conPeriferico++;
+    }
+    if (viasAlertTipos(row).length > 0) slot.alertasVia++;
+    if (rotuloStatus(row) === 'incompleto') slot.rotuloIncompleto++;
+    applyStaff(slot, row, V.fecha, V.enf, V.aux);
+  }
+
+  for (var j = 0; j < uppRows.length; j++) {
+    var urow = uppRows[j];
+    var usec = cellStr(urow, U.sector);
+    if (!map[usec]) map[usec] = emptySectorRow(usec);
+    var uslot = map[usec];
+    uslot.uppUnicas++;
+    if (isYes(urow[U.uppSi])) uslot.conUpp++;
+    if (bradenBand(urow[U.braden]) === 'alto') uslot.bradenAlto++;
+    applyStaff(uslot, urow, U.fecha, U.enf, U.aux);
+  }
+
+  var out = [];
+  for (var k = 0; k < list.length; k++) out.push(publicSectorRow(map[list[k]]));
+  if (!sectorFilter) {
+    for (var extra in map) {
+      if (map.hasOwnProperty(extra) && list.indexOf(extra) === -1) {
+        out.push(publicSectorRow(map[extra]));
+      }
+    }
+  }
+  return out;
+}
+
+function collectAlertas(viasRows, uppRows, limit) {
+  var items = [];
+  for (var i = 0; i < viasRows.length; i++) {
+    var row = viasRows[i];
+    var tipos = viasAlertTipos(row);
+    for (var t = 0; t < tipos.length; t++) {
+      items.push({
+        tipo: tipos[t],
+        sector: cellStr(row, V.sector),
+        habitacion: cellStr(row, V.hab),
+        cama: cellStr(row, V.cama)
+      });
+    }
+  }
+  for (var j = 0; j < uppRows.length; j++) {
+    var urow = uppRows[j];
+    var utipos = uppAlertTipos(urow);
+    for (var u = 0; u < utipos.length; u++) {
+      items.push({
+        tipo: utipos[u],
+        sector: cellStr(urow, U.sector),
+        habitacion: cellStr(urow, U.hab),
+        cama: cellStr(urow, U.cama)
+      });
+    }
+  }
+  return { items: items.slice(0, limit), total: items.length };
 }

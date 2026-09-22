@@ -38,8 +38,13 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const request = event.request;
 
-  // Ignorar llamadas a webhooks externos o métodos no-GET
-  if (request.method !== 'GET' || request.url.includes('script.google.com')) {
+  // Ignorar webhooks y el redirect JSONP de Apps Script (script.googleusercontent.com)
+  const url = request.url;
+  if (
+    request.method !== 'GET' ||
+    url.includes('script.google.com') ||
+    url.includes('script.googleusercontent.com')
+  ) {
     return;
   }
 

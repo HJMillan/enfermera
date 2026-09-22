@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Settings, Wifi, ShieldCheck, HeartPulse, Award, Syringe, Bandage, Keyboard, ClipboardList } from 'lucide-react';
+import { Settings, Wifi, ShieldCheck, HeartPulse, Award, Syringe, Bandage, Keyboard, ClipboardList, BarChart3 } from 'lucide-react';
 import type { BasePatientData, AccesoPerifericoForm as AccesoFormType, UppForm as UppFormType, StoredRecord } from './types/form';
 import { formatCurrentDateTime } from './utils/dateUtils';
 import { haptics } from './utils/haptics';
@@ -19,6 +19,7 @@ import { ModuleTabs, type ActiveTab } from './components/navigation/ModuleTabs';
 import { AccesoPerifericoForm } from './components/forms/AccesoPerifericoForm';
 import { UppForm } from './components/forms/UppForm';
 import { HistoryView } from './components/forms/HistoryView';
+import { StatsView } from './components/forms/StatsView';
 import { SettingsModal } from './components/common/SettingsModal';
 import { ShiftSummaryModal } from './components/common/ShiftSummaryModal';
 import { ToastNotification, type ToastData } from './components/common/ToastNotification';
@@ -86,9 +87,11 @@ export default function App() {
     haptics.light();
   }, [patient.cama, patient.sector, patient.habitacion, handlePatientChange]);
 
-  // Atajos de teclado globales en Chromebook
+  // Atajos de teclado globales en Chromebook (no en Stats/Historial)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (activeTab === 'STATS' || activeTab === 'HISTORY') return;
+
       const activeTag = document.activeElement?.tagName.toLowerCase();
       if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
         return;
@@ -108,7 +111,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleNextBed, handlePatientChange, patient.cama]);
+  }, [activeTab, handleNextBed, handlePatientChange, patient.cama]);
 
   // Función para deshacer el último registro guardado
   const handleUndo = useCallback(
@@ -313,6 +316,26 @@ export default function App() {
 
               <button
                 type="button"
+                onClick={() => setActiveTab('STATS')}
+                className={`w-full p-3 rounded-[var(--radius-md)] border text-left flex items-center justify-between transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] hover:-translate-y-0.5 cursor-pointer ${
+                  activeTab === 'STATS'
+                    ? 'bg-indigo-50/90 border-indigo-400 text-indigo-950 ring-2 ring-indigo-200 shadow-[var(--shadow-rest)]'
+                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+                    <BarChart3 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="font-extrabold text-sm block leading-tight">Números</span>
+                    <span className="text-[11px] text-slate-600">Cómo está la ronda, en criollo</span>
+                  </div>
+                </div>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setActiveTab('HISTORY')}
                 className={`w-full p-3 rounded-[var(--radius-md)] border text-left flex items-center justify-between transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] hover:-translate-y-0.5 cursor-pointer ${
                   activeTab === 'HISTORY'
@@ -374,7 +397,7 @@ export default function App() {
           </div>
 
           {/* Cabecera Persistente de Paciente */}
-          {activeTab !== 'HISTORY' && (
+          {activeTab !== 'HISTORY' && activeTab !== 'STATS' && (
             <div className="w-full">
               <PatientHeader
                 patient={patient}
@@ -409,6 +432,10 @@ export default function App() {
 
             {activeTab === 'HISTORY' && (
               <HistoryView records={records} onRefresh={reloadData} />
+            )}
+
+            {activeTab === 'STATS' && (
+              <StatsView hasWebhook={hasWebhook} />
             )}
           </div>
         </main>

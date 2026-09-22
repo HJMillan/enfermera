@@ -205,6 +205,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                 <li>Pega el código y haz clic en <b>Implementar &gt; Nueva implementación</b>.</li>
                 <li>Selecciona tipo <b>Aplicación web</b> con acceso <b>Cualquier usuario</b>.</li>
                 <li>Copia la URL de la aplicación web y pégala aquí arriba.</li>
+                <li>Para ver <b>Estadísticas</b>, después de pegar el Code.gs actualizado volvé a <b>Implementar → Nueva versión</b>. Sin eso la pestaña no puede leer el archivo.</li>
               </ol>
             )}
           </div>

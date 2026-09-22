@@ -85,7 +85,7 @@ export function mapAccesoPerifericoToRow(data: AccesoPerifericoForm): (string | 
     tiene && data.lumenesTaponMultifuncion ? 'SI' : '',                             // AH
     tiene && data.caracteristicasInfiltracion ? 'SI' : '',                          // AI
     tiene && data.caracteristicasEritematoso ? 'SI' : '',                           // AJ
-    tiene && data.caracteristicasRetorno ? 'SI' : '',                               // AK
+    tiene ? (data.caracteristicasRetorno ? 'SI' : 'NO') : '',                        // AK
     tiene ? (data.infusionType || '') : '',                                         // AL
     data.motivoAusente ? (data.observaciones ? `${data.motivoAusente} - ${data.observaciones}` : data.motivoAusente) : (data.observaciones || '') // AM
   ];

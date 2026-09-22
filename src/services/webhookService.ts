@@ -1,4 +1,5 @@
 import type { FormType, AccesoPerifericoForm, UppForm, StoredRecord } from '../types/form';
+import type { StatsFilters, StatsPayload } from '../types/stats';
 import { mapAccesoPerifericoToRow, mapUppToRow } from './sheetMapper';
 import {
   getStoredWebhookUrl,
@@ -181,4 +182,117 @@ export async function requestShiftSummaryEmail(customRecipients?: string[]): Pro
       message: 'Fallo al solicitar el envío del correo: ' + (err instanceof Error ? err.message : 'Error de red'),
     };
   }
+}
+
+export class StatsFetchError extends Error {
+  code: 'NO_WEBHOOK' | 'TIMEOUT' | 'NETWORK' | 'SCRIPT';
+
+  constructor(code: StatsFetchError['code'], message: string) {
+    super(message);
+    this.name = 'StatsFetchError';
+    this.code = code;
+  }
+}
+
+export async function fetchSheetStatistics(filters: StatsFilters): Promise<StatsPayload> {
+  const webhookUrl = getStoredWebhookUrl().trim();
+  if (!webhookUrl) {
+    throw new StatsFetchError('NO_WEBHOOK', 'No hay URL de Google Sheets configurada.');
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(webhookUrl);
+  } catch {
+    throw new StatsFetchError('NETWORK', 'La URL del webhook no es válida.');
+  }
+
+  const cbName = `peStats_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  parsed.searchParams.set('action', 'GET_STATS');
+  parsed.searchParams.set('callback', cbName);
+  parsed.searchParams.set('ronda', filters.ronda);
+
+  if (filters.from) parsed.searchParams.set('from', filters.from);
+  else parsed.searchParams.delete('from');
+  if (filters.to) parsed.searchParams.set('to', filters.to);
+  else parsed.searchParams.delete('to');
+  if (filters.sector) parsed.searchParams.set('sector', filters.sector);
+  else parsed.searchParams.delete('sector');
+
+  if (filters.evaluables) parsed.searchParams.set('evaluables', '1');
+  else parsed.searchParams.delete('evaluables');
+  if (filters.alertas) parsed.searchParams.set('alertas', '1');
+  else parsed.searchParams.delete('alertas');
+  if (filters.conVia) parsed.searchParams.set('conVia', '1');
+  else parsed.searchParams.delete('conVia');
+  if (filters.rotuloIncompleto) parsed.searchParams.set('rotulo', 'incompleto');
+  else parsed.searchParams.delete('rotulo');
+  if (filters.conUpp) parsed.searchParams.set('conUpp', '1');
+  else parsed.searchParams.delete('conUpp');
+  if (filters.bradenAlto) parsed.searchParams.set('braden', 'alto');
+  else parsed.searchParams.delete('braden');
+
+  const url = parsed.toString();
+
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    let settled = false;
+
+    const cleanup = () => {
+      window.clearTimeout(timer);
+      script.remove();
+      delete (window as unknown as Record<string, unknown>)[cbName];
+    };
+
+    const timer = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new StatsFetchError('TIMEOUT', 'El Sheet tardó demasiado en responder.'));
+    }, 25000);
+
+    (window as unknown as Record<string, unknown>)[cbName] = (data: StatsPayload) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (!data || typeof data !== 'object') {
+        reject(new StatsFetchError('SCRIPT', 'El script devolvió una respuesta vacía.'));
+        return;
+      }
+      if (data.status === 'error') {
+        reject(new StatsFetchError('SCRIPT', data.message || 'El script devolvió un error.'));
+        return;
+      }
+      if (data.status === 'online') {
+        reject(
+          new StatsFetchError(
+            'SCRIPT',
+            'El script aún no tiene Estadísticas. Copiá el Code.gs actualizado e implementá una nueva versión en Apps Script.'
+          )
+        );
+        return;
+      }
+      if (data.status !== 'success' || !data.cobertura) {
+        reject(new StatsFetchError('SCRIPT', 'La respuesta de estadísticas está incompleta.'));
+        return;
+      }
+      resolve(data);
+    };
+
+    script.onerror = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(
+        new StatsFetchError(
+          'NETWORK',
+          'No se pudo leer el Sheet. Verificá la URL y que el script esté redesplegado.'
+        )
+      );
+    };
+
+    script.async = true;
+    script.src = url;
+    document.body.appendChild(script);
+  });
 }
