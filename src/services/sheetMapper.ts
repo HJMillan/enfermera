@@ -1,4 +1,4 @@
-import type { AccesoPerifericoForm, UppForm } from '../types/form';
+import type { AccesoPerifericoForm, SondaVesicalForm, UppForm } from '../types/form';
 
 // Cabeceras para la hoja Acceso Periférico (38 columnas)
 export const ACCESO_PERIFERICO_HEADERS = [
@@ -40,7 +40,9 @@ export const ACCESO_PERIFERICO_HEADERS = [
   'Eritematoso',         // AJ
   'Retorno',             // AK
   'Infusión Tipo',       // AL
-  'Observaciones'        // AM
+  'Observaciones',       // AM
+  'Fecha Ingreso',       // AN
+  'Sexo'                 // AO
 ];
 
 export function mapAccesoPerifericoToRow(data: AccesoPerifericoForm): (string | number | boolean)[] {
@@ -87,7 +89,9 @@ export function mapAccesoPerifericoToRow(data: AccesoPerifericoForm): (string | 
     tiene && data.caracteristicasEritematoso ? 'SI' : '',                           // AJ
     tiene ? (data.caracteristicasRetorno ? 'SI' : 'NO') : '',                        // AK
     tiene ? (data.infusionType || '') : '',                                         // AL
-    data.motivoAusente ? (data.observaciones ? `${data.motivoAusente} - ${data.observaciones}` : data.motivoAusente) : (data.observaciones || '') // AM
+    data.motivoAusente ? (data.observaciones ? `${data.motivoAusente} - ${data.observaciones}` : data.motivoAusente) : (data.observaciones || ''), // AM
+    data.fechaIngreso || '',                                                        // AN
+    data.sexo === 'M' ? 'Masculino' : data.sexo === 'F' ? 'Femenino' : ''           // AO
   ];
 }
 
@@ -128,7 +132,8 @@ export const UPP_HEADERS = [
   'Nutrición Enteral BG',      // AG
   'Colchón Anti-escaras (SI)', // AH
   'Colchón Anti-escaras (NO)', // AI
-  'Obs Colchón'                // AJ
+  'Obs Colchón',               // AJ
+  'Sexo'                       // AK
 ];
 
 export function mapUppToRow(data: UppForm): (string | number | boolean)[] {
@@ -173,6 +178,61 @@ export function mapUppToRow(data: UppForm): (string | number | boolean)[] {
     tiene && (data.nutricionEnteralBg || data.nutricion === 'enteral BG') ? 'SI' : '', // AG
     tiene ? (data.colchonAntiEscaras ? 'SI' : '') : '',                             // AH
     tiene ? (!data.colchonAntiEscaras ? 'NO' : '') : '',                            // AI
-    !tiene && data.motivoAusente ? `Paciente ausente / Cama libre: ${data.motivoAusente}` : (data.observacionesColchon || '') // AJ
+    !tiene && data.motivoAusente ? `Paciente ausente / Cama libre: ${data.motivoAusente}` : (data.observacionesColchon || ''), // AJ
+    data.sexo === 'M' ? 'Masculino' : data.sexo === 'F' ? 'Femenino' : ''           // AK
+  ];
+}
+
+const MOTIVO_UBICACION_LABEL: Record<string, string> = {
+  nefrectomia_derecha: 'Nefrectomía derecha',
+  nefrectomia_izquierda: 'Nefrectomía izquierda',
+  bricker: 'Bricker',
+  nada: 'Nada',
+};
+
+export const SONDA_HEADERS = [
+  'Fecha/Hora',
+  'Sector',
+  'Habitación',
+  'Cama',
+  'HC',
+  'Cant. Enfermeras',
+  'Cant. Auxiliares',
+  'Fecha Ingreso',
+  'Sexo',
+  'Tiene Sonda',
+  'Numero Sonda',
+  'Lumenes',
+  'Fijacion',
+  'Ubicacion Correcta',
+  'Motivo Ubicacion',
+  'Observaciones',
+];
+
+export function mapSondaToRow(data: SondaVesicalForm): (string | number | boolean)[] {
+  const tiene = data.tieneSonda === 'SI';
+  const motivo = tiene && data.ubicacionCorrecta === 'NO'
+    ? (MOTIVO_UBICACION_LABEL[data.ubicacionMotivo || ''] || data.ubicacionMotivo || '')
+    : '';
+
+  return [
+    data.fechaHora,
+    data.sector,
+    data.habitacion,
+    data.cama,
+    data.historiaClinica || '',
+    data.cantidadEnfermeras ?? '',
+    data.cantidadAuxiliares ?? '',
+    data.fechaIngreso || '',
+    data.sexo === 'M' ? 'Masculino' : data.sexo === 'F' ? 'Femenino' : '',
+    data.tieneSonda || (data.motivoAusente ? 'NO' : ''),
+    tiene ? (data.numeroSonda || '') : '',
+    tiene ? (data.lumenes || '') : '',
+    tiene ? (data.fijacion || '') : '',
+    tiene ? (data.ubicacionCorrecta || '') : '',
+    motivo,
+    data.motivoAusente
+      ? (data.observaciones ? `${data.motivoAusente} - ${data.observaciones}` : data.motivoAusente)
+      : (data.observaciones || ''),
   ];
 }

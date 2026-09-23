@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Settings, Wifi, ShieldCheck, HeartPulse, Award, Syringe, Bandage, Keyboard, ClipboardList, BarChart3 } from 'lucide-react';
-import type { BasePatientData, AccesoPerifericoForm as AccesoFormType, UppForm as UppFormType, StoredRecord } from './types/form';
+import { Settings, Wifi, ShieldCheck, HeartPulse, Award, Syringe, Bandage, Keyboard, ClipboardList, BarChart3, Droplets } from 'lucide-react';
+import type { BasePatientData, AccesoPerifericoForm as AccesoFormType, UppForm as UppFormType, SondaVesicalForm as SondaFormType, StoredRecord } from './types/form';
 import { formatCurrentDateTime } from './utils/dateUtils';
 import { haptics } from './utils/haptics';
 import {
@@ -19,6 +19,7 @@ import { PatientHeader } from './components/common/PatientHeader';
 import { ModuleTabs, type ActiveTab } from './components/navigation/ModuleTabs';
 import { AccesoPerifericoForm } from './components/forms/AccesoPerifericoForm';
 import { UppForm } from './components/forms/UppForm';
+import { SondaVesicalForm } from './components/forms/SondaVesicalForm';
 import { HistoryView } from './components/forms/HistoryView';
 import { StatsView } from './components/forms/StatsView';
 import { SettingsModal } from './components/common/SettingsModal';
@@ -39,6 +40,8 @@ export default function App() {
     const staff = getStaffBySector(memory.sector);
     return {
       fechaHora: formatCurrentDateTime(),
+      fechaIngreso: memory.fechaIngreso || '',
+      sexo: memory.sexo || '',
       sector: memory.sector,
       habitacion: memory.habitacion,
       cama: memory.cama,
@@ -47,6 +50,7 @@ export default function App() {
       cantidadAuxiliares: staff.auxiliares,
     };
   });
+  const [fechaHoraTouched, setFechaHoraTouched] = useState(false);
 
   // Cargar registros e información de webhook
   const reloadData = useCallback(() => {
@@ -54,27 +58,54 @@ export default function App() {
     setHasWebhook(Boolean(getStoredWebhookUrl()));
   }, []);
 
-  // Actualizar reloj
+  // Actualizar reloj solo si la enfermera no editó la fecha
   useEffect(() => {
+    if (fechaHoraTouched) return;
     const timer = setInterval(() => {
       setPatient((prev) => ({ ...prev, fechaHora: formatCurrentDateTime() }));
     }, 30000);
     return () => clearInterval(timer);
-  }, []);
+  }, [fechaHoraTouched]);
+
+  const persistPatientMemory = (next: BasePatientData) => {
+    savePatientContextMemory({
+      sector: next.sector,
+      habitacion: next.habitacion,
+      cama: next.cama,
+      historiaClinica: next.historiaClinica || '',
+      sexo: next.sexo || '',
+      fechaIngreso: next.fechaIngreso || '',
+    });
+  };
 
   // Manejo de cambios en el paciente
   const handlePatientChange = useCallback((updated: Partial<BasePatientData>) => {
+    if (updated.fechaHora !== undefined) {
+      setFechaHoraTouched(true);
+    }
     setPatient((prev) => {
       const next = { ...prev, ...updated };
-      savePatientContextMemory({
-        sector: next.sector,
-        habitacion: next.habitacion,
-        cama: next.cama,
-        historiaClinica: next.historiaClinica || '',
-      });
+      persistPatientMemory(next);
       return next;
     });
   }, []);
+
+  const afterSuccessfulSave = (prevCama: string) => {
+    setFechaHoraTouched(false);
+    const currentBed = parseInt(prevCama, 10);
+    setPatient((prev) => {
+      const next = {
+        ...prev,
+        fechaHora: formatCurrentDateTime(),
+        cama: !isNaN(currentBed) ? String(Math.min(MAX_BEDS, currentBed + 1)) : prev.cama,
+        sexo: '' as const,
+        fechaIngreso: '',
+        historiaClinica: '',
+      };
+      persistPatientMemory(next);
+      return next;
+    });
+  };
 
   // Botón rápido: Siguiente Cama (+1)
   const handleNextBed = useCallback(() => {
@@ -120,12 +151,8 @@ export default function App() {
       deleteRecordLocally(recordId);
       reloadData();
       setPatient(prevPatient);
-      savePatientContextMemory({
-        sector: prevPatient.sector,
-        habitacion: prevPatient.habitacion,
-        cama: prevPatient.cama,
-        historiaClinica: prevPatient.historiaClinica || '',
-      });
+      persistPatientMemory(prevPatient);
+      setFechaHoraTouched(true);
       setToast({
         type: 'warning',
         message: `↩️ Registro deshecho. Vuelto a Sec ${prevPatient.sector} Hab ${prevPatient.habitacion} Cama ${prevPatient.cama}`,
@@ -140,12 +167,7 @@ export default function App() {
     const prevPatient = { ...patient };
     const res = await submitPatientRecord('ACCESO_PERIFERICO', formData);
     reloadData();
-
-    // Auto-avanzar cama
-    const currentBed = parseInt(patient.cama, 10);
-    if (!isNaN(currentBed)) {
-      handlePatientChange({ cama: String(Math.min(MAX_BEDS, currentBed + 1)) });
-    }
+    afterSuccessfulSave(patient.cama);
 
     const situacionTexto = formData.tieneAcceso
       ? 'Con vía'
@@ -175,22 +197,42 @@ export default function App() {
     const prevPatient = { ...patient };
     const res = await submitPatientRecord('UPP', formData);
     reloadData();
-
-    // Auto-avanzar cama
-    const currentBed = parseInt(patient.cama, 10);
-    if (!isNaN(currentBed)) {
-      handlePatientChange({ cama: String(Math.min(MAX_BEDS, currentBed + 1)) });
-    }
+    afterSuccessfulSave(patient.cama);
 
     const situacionUppTexto = formData.tieneUpp
-      ? 'Con UPP'
+      ? 'Con LPP'
       : formData.motivoAusente
       ? formData.motivoAusente
       : 'Piel Íntegra';
 
     setToast({
       type: 'success',
-      message: `✅ UPP: Sec ${formData.sector} Hab ${formData.habitacion} Cama ${formData.cama} (${situacionUppTexto})`,
+      message: `✅ LPP: Sec ${formData.sector} Hab ${formData.habitacion} Cama ${formData.cama} (${situacionUppTexto})`,
+      action: res.recordId
+        ? {
+            label: 'Deshacer',
+            onClick: () => handleUndo(res.recordId!, prevPatient),
+          }
+        : undefined,
+      durationMs: 5000,
+    });
+
+    haptics.success();
+  };
+
+  const handleSondaSubmit = async (formData: SondaFormType) => {
+    const prevPatient = { ...patient };
+    const res = await submitPatientRecord('SONDA_VESICAL', formData);
+    reloadData();
+    afterSuccessfulSave(patient.cama);
+
+    const situacionSonda = formData.tieneSonda === 'SI'
+      ? `Con sonda Fr ${formData.numeroSonda || '?'}`
+      : formData.motivoAusente || 'Sin sonda';
+
+    setToast({
+      type: 'success',
+      message: `✅ Sonda: Sec ${formData.sector} Hab ${formData.habitacion} Cama ${formData.cama} (${situacionSonda})`,
       action: res.recordId
         ? {
             label: 'Deshacer',
@@ -205,6 +247,7 @@ export default function App() {
 
   const viasRecords = records.filter((r) => r.formType === 'ACCESO_PERIFERICO');
   const uppRecords = records.filter((r) => r.formType === 'UPP');
+  const sondaRecords = records.filter((r) => r.formType === 'SONDA_VESICAL');
   const pendingCount = records.filter((r) => r.syncStatus !== 'SYNCED').length;
 
   return (
@@ -310,11 +353,32 @@ export default function App() {
                     <Bandage className="w-4 h-4" />
                   </div>
                   <div>
-                    <span className="font-extrabold text-sm block leading-tight">Ronda 2: UPP</span>
+                    <span className="font-extrabold text-sm block leading-tight">Ronda 2: LPP</span>
                     <span className="text-[11px] text-slate-600">Piel, Braden y colchones</span>
                   </div>
                 </div>
                 <span className="font-black text-base text-rose-800">{uppRecords.length}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('SONDA_VESICAL')}
+                className={`w-full p-3 rounded-[var(--radius-md)] border text-left flex items-center justify-between transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] hover:-translate-y-0.5 cursor-pointer ${
+                  activeTab === 'SONDA_VESICAL'
+                    ? 'bg-teal-50/90 border-teal-400 text-teal-950 ring-2 ring-teal-200 shadow-[var(--shadow-rest)]'
+                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-teal-600 text-white flex items-center justify-center shadow-xs">
+                    <Droplets className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="font-extrabold text-sm block leading-tight">Ronda 3: Sondas vesicales</span>
+                    <span className="text-[11px] text-slate-600">Graduación, lúmenes y fijación</span>
+                  </div>
+                </div>
+                <span className="font-black text-base text-teal-800">{sondaRecords.length}</span>
               </button>
 
               <button
@@ -394,6 +458,7 @@ export default function App() {
               onSelectTab={setActiveTab}
               viasCount={viasRecords.length}
               uppCount={uppRecords.length}
+              sondaCount={sondaRecords.length}
               historyCount={records.length}
               pendingCount={pendingCount}
             />
@@ -430,6 +495,14 @@ export default function App() {
                 patient={patient}
                 onSubmit={handleUppSubmit}
                 onOpenShiftClose={() => setIsShiftModalOpen(true)}
+              />
+            )}
+
+            {activeTab === 'SONDA_VESICAL' && (
+              <SondaVesicalForm
+                key={`${patient.sector}-${patient.habitacion}-${patient.cama}`}
+                patient={patient}
+                onSubmit={handleSondaSubmit}
               />
             )}
 

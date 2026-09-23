@@ -14,7 +14,7 @@ import type { BasePatientData, UppForm as UppFormType } from '../../types/form';
 import { ToggleYesNo } from '../common/ToggleYesNo';
 import { TouchChip } from '../common/TouchChip';
 import { BedStatusSelector } from '../common/BedStatusSelector';
-import { getCurrentDateISO } from '../../utils/dateUtils';
+import { validateSharedPatient } from '../../utils/patientValidation';
 
 interface UppFormProps {
   patient: BasePatientData;
@@ -44,7 +44,6 @@ const COMMON_TREATMENTS = [
 const INITIAL_UPP_STATE = {
   tieneUpp: false,
   motivoAusente: '',
-  fechaIngreso: getCurrentDateISO(),
   pasoAreaCerrada: false,
   areaCerradaCual: '',
   cuantas: 1,
@@ -77,6 +76,7 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
   const [form, setForm] = useState(INITIAL_UPP_STATE);
   const [hasOtroDispositivo, setHasOtroDispositivo] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Atajos de teclado en Chromebook
   useEffect(() => {
@@ -113,6 +113,14 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.motivoAusente) {
+      const sharedError = validateSharedPatient(patient);
+      if (sharedError) {
+        setError(sharedError);
+        return;
+      }
+    }
+    setError(null);
     setIsSubmitting(true);
     try {
       const allTreatments = [...form.tratamientos];
@@ -168,6 +176,11 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
       onSubmit={handleSubmit}
       className="px-3 pb-12 md:px-4 space-y-3.5 max-w-2xl mx-auto"
     >
+      {error && (
+        <p className="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-[var(--radius-sm)] px-3 py-2">
+          {error}
+        </p>
+      )}
       {/* 0. ESTADO DE LA CAMA (Al comienzo del relevamiento) */}
       <BedStatusSelector
         value={form.motivoAusente || ''}
@@ -190,7 +203,7 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
               Cama {patient.cama} — {form.motivoAusente === 'Libre' ? 'Cama Libre' : `Paciente en ${form.motivoAusente}`}
             </h3>
             <p className="text-xs text-amber-800 font-medium max-w-md mx-auto">
-              Relevamiento de UPP bloqueado para esta cama ya que el paciente no se encuentra en ella.
+              Relevamiento de LPP bloqueado para esta cama ya que el paciente no se encuentra en ella.
             </p>
           </div>
 
@@ -228,7 +241,7 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
             </div>
 
             <ToggleYesNo
-              label="¿El paciente presenta Úlcera por Presión (UPP)?"
+              label="¿El paciente presenta Lesión por presión (LPP)?"
               description="Selecciona NO si la piel se encuentra íntegra sin lesiones"
               value={form.tieneUpp}
               onChange={(val) => setForm((prev) => ({ ...prev, tieneUpp: val }))}
@@ -244,14 +257,14 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
                 className="w-full min-h-[56px] rounded-[var(--radius-md)] bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-base md:text-lg flex items-center justify-center gap-2 shadow-[var(--shadow-hover)] cursor-pointer transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] hover:-translate-y-0.5"
               >
                 <CheckCircle className="w-5 h-5" />
-                <span>{isSubmitting ? 'Guardando...' : 'Guardar Paciente (Sin UPP / Piel Íntegra)'}</span>
+                <span>{isSubmitting ? 'Guardando...' : 'Guardar Paciente (Sin LPP / Piel Íntegra)'}</span>
                 <span className="text-xs bg-emerald-700/60 px-2 py-0.5 rounded-[var(--radius-sm)] font-mono hidden sm:inline">
                   [Enter]
                 </span>
               </button>
 
               <p className="text-center text-xs text-slate-600 font-medium">
-                Se registrará como NO presenta úlceras por presión para esta cama.
+                Se registrará como NO presenta lesiones por presión para esta cama.
               </p>
 
               {/* Botón rápido para finalizar turno */}
@@ -263,7 +276,7 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
                     className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-800 bg-slate-100 hover:bg-slate-200 px-3.5 py-2 rounded-[var(--radius-sm)] border border-slate-300 transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] cursor-pointer"
                   >
                     <Award className="w-4 h-4 text-sky-700" />
-                    <span>¿Finalizaste la ronda de UPP? Ver Cierre de Turno 8-16hs</span>
+                    <span>¿Finalizaste la ronda de LPP? Ver Cierre de Turno 8-16hs</span>
                   </button>
                 </div>
               )}
@@ -280,19 +293,7 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
               Datos de Ingreso del Paciente
             </span>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-[11px] font-bold text-slate-600 uppercase block mb-1">
-                  Fecha de Ingreso
-                </label>
-                <input
-                  type="date"
-                  value={form.fechaIngreso}
-                  onChange={(e) => setForm((p) => ({ ...p, fechaIngreso: e.target.value }))}
-                  className="w-full min-h-[44px] px-3 rounded-[var(--radius-sm)] border border-slate-200 text-xs font-semibold text-slate-700 bg-slate-50 focus:bg-white transition-[background-color,border-color,box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-smooth)]"
-                />
-              </div>
-
+            <div className="grid grid-cols-1 gap-3">
               <div>
                 <label className="text-[11px] font-bold text-slate-600 uppercase block mb-1">
                   ¿Pasó por Área Cerrada?
@@ -427,7 +428,7 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
           <div className="bg-white p-4 rounded-[var(--radius-md)] border border-slate-200/80 shadow-[var(--shadow-rest)] transition-[transform,box-shadow,border-color] duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-hover)] space-y-3">
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="font-bold text-slate-800 text-sm">Grado de la UPP</span>
+                <span className="font-bold text-slate-800 text-sm">Grado de la LPP</span>
                 <span className="text-[11px] text-rose-700 font-semibold">
                   (Selección múltiple permitida)
                 </span>
@@ -705,7 +706,7 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
               className="w-full min-h-[56px] rounded-[var(--radius-md)] bg-rose-700 hover:bg-rose-800 text-white font-extrabold text-base md:text-lg flex items-center justify-center gap-2 shadow-[var(--shadow-hover)] cursor-pointer transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] hover:-translate-y-0.5"
             >
               <Save className="w-5 h-5" />
-              <span>{isSubmitting ? 'Guardando...' : 'Guardar Registro de UPP'}</span>
+              <span>{isSubmitting ? 'Guardando...' : 'Guardar Registro de LPP'}</span>
               <span className="text-xs bg-rose-800/60 px-2 py-0.5 rounded-[var(--radius-sm)] font-mono hidden sm:inline">
                 [Enter]
               </span>

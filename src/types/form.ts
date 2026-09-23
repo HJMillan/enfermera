@@ -9,8 +9,12 @@ export type SectorType =
   | 'E'
   | string;
 
+export type SexoPaciente = 'M' | 'F' | '';
+
 export interface BasePatientData {
   fechaHora: string;
+  fechaIngreso: string;
+  sexo: SexoPaciente;
   sector: SectorType;
   habitacion: string;
   cama: string;
@@ -43,7 +47,7 @@ export interface AccesoPerifericoForm extends BasePatientData {
   visibilidad?: boolean;
   fijacionTegaderm?: boolean;
   fijacionCinta?: boolean;
-  fijacionCintaTipo?: 'hipoalergénica' | 'tela' | 'seda' | 'coban' | 'papel' | '';
+  fijacionCintaTipo?: 'hipoalergénica' | 'tela' | 'seda' | 'coban' | 'papel' | 'transparente' | '';
   fijacionHipafix?: boolean;
   fijacionVenda?: boolean;
   fijacionContencionMecanica?: boolean;
@@ -72,7 +76,6 @@ export interface AccesoPerifericoForm extends BasePatientData {
 export interface UppForm extends BasePatientData {
   tieneUpp: boolean;
   motivoAusente?: string;
-  fechaIngreso?: string;
   pasoAreaCerrada?: boolean;
   areaCerradaCual?: string;
   cuantas?: number;
@@ -114,7 +117,25 @@ export interface UppForm extends BasePatientData {
   observaciones?: string;
 }
 
-export type FormType = 'ACCESO_PERIFERICO' | 'UPP';
+export type UbicacionSondaMotivo =
+  | 'nefrectomia_derecha'
+  | 'nefrectomia_izquierda'
+  | 'bricker'
+  | 'nada'
+  | '';
+
+export interface SondaVesicalForm extends BasePatientData {
+  tieneSonda: 'SI' | 'NO' | '';
+  numeroSonda?: string;
+  lumenes?: '2' | '3' | '';
+  fijacion?: 'SI' | 'NO' | '';
+  ubicacionCorrecta?: 'SI' | 'NO' | '';
+  ubicacionMotivo?: UbicacionSondaMotivo;
+  motivoAusente?: string;
+  observaciones?: string;
+}
+
+export type FormType = 'ACCESO_PERIFERICO' | 'UPP' | 'SONDA_VESICAL';
 
 export type SyncStatus = 'PENDING' | 'SYNCED' | 'FAILED';
 
@@ -122,7 +143,7 @@ export interface StoredRecord {
   id: string;
   formType: FormType;
   timestamp: string;
-  data: AccesoPerifericoForm | UppForm;
+  data: AccesoPerifericoForm | UppForm | SondaVesicalForm;
   rowValues: (string | number | boolean)[];
   syncStatus: SyncStatus;
   errorMessage?: string;

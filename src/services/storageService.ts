@@ -1,5 +1,5 @@
-import type { StoredRecord, SectorType } from '../types/form';
-import { ACCESO_PERIFERICO_HEADERS, UPP_HEADERS } from './sheetMapper';
+import type { StoredRecord, SectorType, SexoPaciente } from '../types/form';
+import { ACCESO_PERIFERICO_HEADERS, UPP_HEADERS, SONDA_HEADERS } from './sheetMapper';
 
 const STORAGE_KEYS = {
   WEBHOOK_URL: 'pe_webhook_url',
@@ -9,6 +9,8 @@ const STORAGE_KEYS = {
   RECORDS_HISTORY: 'pe_records_history_v1',
   NOTIFICATION_EMAILS: 'pe_notification_emails',
   LAST_HC: 'pe_last_hc',
+  LAST_SEXO: 'pe_last_sexo',
+  LAST_FECHA_INGRESO: 'pe_last_fecha_ingreso',
   STAFF_BY_SECTOR: 'pe_staff_by_sector_v1',
 };
 
@@ -71,14 +73,19 @@ export interface PatientContextMemory {
   habitacion: string;
   cama: string;
   historiaClinica: string;
+  sexo: SexoPaciente;
+  fechaIngreso: string;
 }
 
 export function getPatientContextMemory(): PatientContextMemory {
+  const sexoRaw = localStorage.getItem(STORAGE_KEYS.LAST_SEXO);
   return {
     sector: (localStorage.getItem(STORAGE_KEYS.LAST_SECTOR) as SectorType) || 'PB',
     habitacion: localStorage.getItem(STORAGE_KEYS.LAST_ROOM) || '1',
     cama: localStorage.getItem(STORAGE_KEYS.LAST_BED) || '1',
     historiaClinica: localStorage.getItem(STORAGE_KEYS.LAST_HC) || '',
+    sexo: sexoRaw === 'M' || sexoRaw === 'F' ? sexoRaw : '',
+    fechaIngreso: localStorage.getItem(STORAGE_KEYS.LAST_FECHA_INGRESO) || '',
   };
 }
 
@@ -87,6 +94,8 @@ export function savePatientContextMemory(data: PatientContextMemory): void {
   localStorage.setItem(STORAGE_KEYS.LAST_ROOM, data.habitacion);
   localStorage.setItem(STORAGE_KEYS.LAST_BED, data.cama);
   localStorage.setItem(STORAGE_KEYS.LAST_HC, data.historiaClinica || '');
+  localStorage.setItem(STORAGE_KEYS.LAST_SEXO, data.sexo || '');
+  localStorage.setItem(STORAGE_KEYS.LAST_FECHA_INGRESO, data.fechaIngreso || '');
 }
 
 // Records History & Queue
@@ -138,6 +147,7 @@ export function exportRecordsToCSV(): void {
 
   const accesoRecords = records.filter((r) => r.formType === 'ACCESO_PERIFERICO');
   const uppRecords = records.filter((r) => r.formType === 'UPP');
+  const sondaRecords = records.filter((r) => r.formType === 'SONDA_VESICAL');
 
   let csvContent = 'data:text/csv;charset=utf-8,';
 
@@ -151,9 +161,18 @@ export function exportRecordsToCSV(): void {
   }
 
   if (uppRecords.length > 0) {
-    csvContent += '--- ÚLCERAS POR PRESIÓN (UPP) ---\r\n';
+    csvContent += '--- LESIONES POR PRESIÓN (LPP) ---\r\n';
     csvContent += UPP_HEADERS.join(',') + '\r\n';
     uppRecords.forEach((r) => {
+      csvContent += r.rowValues.map((val) => `"${String(val).replace(/"/g, '""')}"`).join(',') + '\r\n';
+    });
+    csvContent += '\r\n';
+  }
+
+  if (sondaRecords.length > 0) {
+    csvContent += '--- SONDAS VESICALES ---\r\n';
+    csvContent += SONDA_HEADERS.join(',') + '\r\n';
+    sondaRecords.forEach((r) => {
       csvContent += r.rowValues.map((val) => `"${String(val).replace(/"/g, '""')}"`).join(',') + '\r\n';
     });
   }

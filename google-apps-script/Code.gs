@@ -1,6 +1,6 @@
 /**
  * PLANILLA ENFERMERA - Google Apps Script (Producción)
- * Versión: 1.1.0 — Estadísticas (GET_STATS JSONP) + stamp de versión en ping/stats
+ * Versión: 1.2.0 — Sondas vesicales + fecha/sexo/ingreso compartidos
  *
  * Endpoint Webhook para inserción automática en Google Sheets,
  * estadísticas de lectura del archivo y reporte de Cierre de Turno.
@@ -17,7 +17,7 @@
 var SPREADSHEET_ID = '';
 
 /** Debe coincidir con SCRIPT_VERSION en src/config/version.ts */
-var SCRIPT_VERSION = '1.1.0';
+var SCRIPT_VERSION = '1.2.0';
 
 var DEFAULT_RECIPIENTS = ['jesusmillan86@gmail.com', 'pamelaestua91@gmail.com'];
 
@@ -62,7 +62,9 @@ var HEADERS_ACCESO_PERIFERICO = [
   'Retorno',             // AK (36)
   'Infusión Tipo',       // AL (37)
   'Observaciones',       // AM (38)
-  'Mail Enviado'         // AN (39)
+  'Fecha Ingreso',       // AN (39)
+  'Sexo',                // AO (40)
+  'Mail Enviado'         // AP (41)
 ];
 
 var HEADERS_UPP = [
@@ -102,7 +104,28 @@ var HEADERS_UPP = [
   'Colchón Anti-escaras (SI)', // AH (33)
   'Colchón Anti-escaras (NO)', // AI (34)
   'Obs Colchón',               // AJ (35)
-  'Mail Enviado'               // AK (36)
+  'Sexo',                      // AK (36)
+  'Mail Enviado'               // AL (37)
+];
+
+var HEADERS_SONDAS = [
+  'Fecha/Hora',
+  'Sector',
+  'Habitación',
+  'Cama',
+  'HC',
+  'Cant. Enfermeras',
+  'Cant. Auxiliares',
+  'Fecha Ingreso',
+  'Sexo',
+  'Tiene Sonda',
+  'Numero Sonda',
+  'Lumenes',
+  'Fijacion',
+  'Ubicacion Correcta',
+  'Motivo Ubicacion',
+  'Observaciones',
+  'Mail Enviado'
 ];
 
 /**
@@ -148,19 +171,25 @@ function doPost(e) {
     }
     
     // CASO 3: Inserción de un nuevo registro de paciente
-    var formType = payload.formType; // 'ACCESO_PERIFERICO' o 'UPP'
+    var formType = payload.formType || 'ACCESO_PERIFERICO';
     var rowValues = payload.rowValues || [];
     
     var ss = getSpreadsheet();
-    var isVias = formType === 'ACCESO_PERIFERICO';
-    var sheetName = isVias ? 'Acceso Periférico' : 'UPP';
-    var expectedHeaders = isVias ? HEADERS_ACCESO_PERIFERICO : HEADERS_UPP;
+    var sheetName = 'Acceso Periférico';
+    var expectedHeaders = HEADERS_ACCESO_PERIFERICO;
+    if (formType === 'UPP') {
+      sheetName = 'UPP';
+      expectedHeaders = HEADERS_UPP;
+    } else if (formType === 'SONDA_VESICAL') {
+      sheetName = 'Sondas Vesicales';
+      expectedHeaders = HEADERS_SONDAS;
+    }
     
     // Asegurar que la hoja exista y tenga los encabezados correspondientes
     var sheet = ensureSheetWithHeaders(ss, sheetName, expectedHeaders);
     
     // Asegurar que el tamaño base de la fila coincida con los datos (sin Mail Enviado)
-    var expectedBaseLength = expectedHeaders.length - 1; // 39 para vías, 36 para UPP
+    var expectedBaseLength = expectedHeaders.length - 1;
     while (rowValues.length < expectedBaseLength) {
       rowValues.push('');
     }
@@ -266,18 +295,57 @@ function ensureSheetWithHeaders(ss, sheetName, expectedHeaders) {
     return sheet;
   }
   
-  // Si ya tiene columnas, verificar si las cabeceras están completas
   var lastCol = sheet.getLastColumn();
   var currentHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-  
-  // Si le faltan columnas o no tiene 'Mail Enviado'
-  if (currentHeaders.length < expectedHeaders.length) {
-    for (var c = currentHeaders.length; c < expectedHeaders.length; c++) {
-      sheet.getRange(1, c + 1)
-        .setValue(expectedHeaders[c])
-        .setFontWeight('bold')
-        .setBackground('#e0f2fe');
+  var present = {};
+  var mailIdx = -1;
+  var i;
+  for (i = 0; i < currentHeaders.length; i++) {
+    var headerName = String(currentHeaders[i] || '').trim();
+    present[headerName] = true;
+    if (headerName === 'Mail Enviado') mailIdx = i;
+  }
+
+  var missingClient = [];
+  for (i = 0; i < expectedHeaders.length; i++) {
+    var expectedName = expectedHeaders[i];
+    if (expectedName === 'Mail Enviado') continue;
+    if (!present[expectedName]) missingClient.push(expectedName);
+  }
+
+  if (missingClient.length > 0) {
+    if (mailIdx >= 0) {
+      sheet.insertColumnsBefore(mailIdx + 1, missingClient.length);
+      for (i = 0; i < missingClient.length; i++) {
+        sheet.getRange(1, mailIdx + 1 + i)
+          .setValue(missingClient[i])
+          .setFontWeight('bold')
+          .setBackground('#e0f2fe');
+      }
+    } else {
+      for (i = 0; i < missingClient.length; i++) {
+        sheet.getRange(1, currentHeaders.length + 1 + i)
+          .setValue(missingClient[i])
+          .setFontWeight('bold')
+          .setBackground('#e0f2fe');
+      }
     }
+  }
+
+  lastCol = sheet.getLastColumn();
+  currentHeaders = lastCol > 0 ? sheet.getRange(1, 1, 1, lastCol).getValues()[0] : [];
+  var hasMail = false;
+  for (i = 0; i < currentHeaders.length; i++) {
+    if (String(currentHeaders[i] || '').trim() === 'Mail Enviado') {
+      hasMail = true;
+      break;
+    }
+  }
+  if (!hasMail) {
+    sheet.getRange(1, currentHeaders.length + 1)
+      .setValue('Mail Enviado')
+      .setFontWeight('bold')
+      .setBackground('#e0f2fe');
   }
   
   return sheet;
@@ -475,7 +543,7 @@ function enviarReporteTurno(recipients) {
   
   html += '<div style="flex: 1; min-width: 110px; background: #ffffff; padding: 12px; border-radius: 10px; border: 1px solid ' + (uppConLesion > 0 ? '#fcd34d' : '#cbd5e1') + '; background-color: ' + (uppConLesion > 0 ? '#fffbeb' : '#ffffff') + '; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">';
   html += '<div style="font-size: 22px; font-weight: bold; color: ' + (uppConLesion > 0 ? '#d97706' : '#64748b') + ';">' + uppConLesion + '</div>';
-  html += '<div style="font-size: 10px; color: ' + (uppConLesion > 0 ? '#d97706' : '#64748b') + '; text-transform: uppercase; font-weight: 600;">UPP Activas</div>';
+  html += '<div style="font-size: 10px; color: ' + (uppConLesion > 0 ? '#d97706' : '#64748b') + '; text-transform: uppercase; font-weight: 600;">LPP Activas</div>';
   html += '</div>';
 
   html += '<div style="flex: 1; min-width: 110px; background: #ffffff; padding: 12px; border-radius: 10px; border: 1px solid #cbd5e1; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">';
@@ -544,14 +612,14 @@ function enviarReporteTurno(recipients) {
   
   // Tabla Resumen UPP Pendientes
   if (pendingUpp.length > 0) {
-    html += '<h3 style="color: #0369a1; font-size: 15px; margin-top: 24px; border-bottom: 2px solid #e0f2fe; padding-bottom: 4px;">🩹 Úlceras por Presión (UPP) Relevadas (' + pendingUpp.length + ')</h3>';
+    html += '<h3 style="color: #0369a1; font-size: 15px; margin-top: 24px; border-bottom: 2px solid #e0f2fe; padding-bottom: 4px;">🩹 Lesiones por presión (LPP) Relevadas (' + pendingUpp.length + ')</h3>';
     html += '<table style="width: 100%; border-collapse: collapse; font-size: 12px; background: #ffffff; border-radius: 6px; overflow: hidden;">';
     html += '<tr style="background: #f1f5f9; text-align: left; color: #475569;">';
     html += '<th style="padding: 7px 8px; border: 1px solid #e2e8f0;">Fecha/Hora</th>';
     html += '<th style="padding: 7px 8px; border: 1px solid #e2e8f0;">Sector</th>';
     html += '<th style="padding: 7px 8px; border: 1px solid #e2e8f0;">Hab/Cama</th>';
     html += '<th style="padding: 7px 8px; border: 1px solid #e2e8f0;">HC</th>';
-    html += '<th style="padding: 7px 8px; border: 1px solid #e2e8f0;">Tiene UPP / Estado</th>';
+    html += '<th style="padding: 7px 8px; border: 1px solid #e2e8f0;">Tiene LPP / Estado</th>';
     html += '<th style="padding: 7px 8px; border: 1px solid #e2e8f0;">Grados</th>';
     html += '<th style="padding: 7px 8px; border: 1px solid #e2e8f0;">Tratamiento</th>';
     html += '<th style="padding: 7px 8px; border: 1px solid #e2e8f0;">Disp. Apoyo</th>';
@@ -618,7 +686,7 @@ function enviarReporteTurno(recipients) {
     csvLines.push('');
   }
   if (pendingUpp.length > 0) {
-    csvLines.push('--- ULCERAS POR PRESION (UPP) ---');
+    csvLines.push('--- LESIONES POR PRESION (LPP) ---');
     var hU = sheetUpp.getRange(1, 1, 1, sheetUpp.getLastColumn()).getDisplayValues()[0];
     csvLines.push(hU.map(escapeCsv).join(','));
     for (var c2 = 0; c2 < pendingUpp.length; c2++) {
@@ -754,7 +822,7 @@ function menuVerPendientes() {
   ui.alert(
     'Registros Pendientes de Envío',
     '• Vías Periféricas: ' + pendV + ' pendientes\n' +
-    '• UPP: ' + pendU + ' pendientes\n' +
+    '• LPP: ' + pendU + ' pendientes\n' +
     'Total: ' + (pendV + pendU) + ' registros.',
     ui.ButtonSet.OK
   );
@@ -825,6 +893,12 @@ var U = {
   colchonSi: 33, colchonNo: 34, obs: 35
 };
 
+var S = {
+  fecha: 0, sector: 1, hab: 2, cama: 3, hc: 4, enf: 5, aux: 6,
+  ingreso: 7, sexo: 8, tiene: 9, numero: 10, lumenes: 11,
+  fijacion: 12, ubicacion: 13, motivo: 14, obs: 15
+};
+
 function buildStatistics(params) {
   var fromIso = String(params.from || '').trim();
   var toIso = String(params.to || '').trim();
@@ -837,18 +911,22 @@ function buildStatistics(params) {
   var onlyConUpp = isFlag(params.conUpp);
   var onlyBradenAlto = String(params.braden || '').toLowerCase() === 'alto';
 
-  var loadVias = ronda !== 'upp';
-  var loadUpp = ronda !== 'vias';
+  var loadVias = ronda === 'ambas' || ronda === 'vias';
+  var loadUpp = ronda === 'ambas' || ronda === 'upp';
+  var loadSondas = ronda === 'ambas' || ronda === 'sondas';
 
   var ss = getSpreadsheet();
   var viasRaw = loadVias ? readSheetRows(ss, 'Acceso Periférico') : [];
   var uppRaw = loadUpp ? readSheetRows(ss, 'UPP') : [];
+  var sondasRaw = loadSondas ? readSheetRows(ss, 'Sondas Vesicales') : [];
 
   var viasDated = filterByDateAndSector(viasRaw, fromIso, toIso, sectorFilter, V.fecha, V.sector, V.hab, V.cama);
   var uppDated = filterByDateAndSector(uppRaw, fromIso, toIso, sectorFilter, U.fecha, U.sector, U.hab, U.cama);
+  var sondasDated = filterByDateAndSector(sondasRaw, fromIso, toIso, sectorFilter, S.fecha, S.sector, S.hab, S.cama);
 
   var viasLast = lastRowByBed(viasDated, V.fecha, V.sector, V.hab, V.cama);
   var uppLast = lastRowByBed(uppDated, U.fecha, U.sector, U.hab, U.cama);
+  var sondasLast = lastRowByBed(sondasDated, S.fecha, S.sector, S.hab, S.cama);
 
   var viasEval = [];
   var uppEval = [];
@@ -890,13 +968,15 @@ function buildStatistics(params) {
 
   var viasStats = summarizeVias(viasEval);
   var uppStats = summarizeUpp(uppEval);
-  var porSector = summarizeBySector(viasEval, uppEval, sectorFilter);
+  var sondasStats = summarizeSondas(sondasLast);
+  var porSector = summarizeBySector(viasEval, uppEval, sondasLast, sectorFilter);
   var alertasPack = collectAlertas(viasEval, uppEval, 30);
 
   var generatedAt = Utilities.formatDate(new Date(), 'America/Argentina/Buenos_Aires', 'dd/MM/yyyy HH:mm');
 
   return {
     status: 'success',
+    version: SCRIPT_VERSION,
     generatedAt: generatedAt,
     from: fromIso || null,
     to: toIso || null,
@@ -905,8 +985,10 @@ function buildStatistics(params) {
     cobertura: {
       registrosVias: viasDated.length,
       registrosUpp: uppDated.length,
+      registrosSondas: sondasDated.length,
       viasUnicas: viasEval.length,
       uppUnicas: uppEval.length,
+      sondasUnicas: sondasLast.length,
       noEvaluablesVias: noEvalVias,
       noEvaluablesUpp: noEvalUpp,
       capacidad: sectorCapacity(sectorFilter),
@@ -914,9 +996,36 @@ function buildStatistics(params) {
     },
     vias: viasStats,
     upp: uppStats,
+    sondas: sondasStats,
     alertas: alertasPack.items,
     alertasTotal: alertasPack.total
   };
+}
+
+function summarizeSondas(rows) {
+  var out = {
+    evaluadas: rows.length,
+    conSonda: 0,
+    sinSonda: 0,
+    lumenes2: 0,
+    lumenes3: 0,
+    fijacionSi: 0,
+    ubicacionNo: 0
+  };
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    if (isYes(row[S.tiene])) {
+      out.conSonda++;
+      var lum = String(row[S.lumenes] || '').trim();
+      if (lum === '2') out.lumenes2++;
+      if (lum === '3') out.lumenes3++;
+      if (isYes(row[S.fijacion])) out.fijacionSi++;
+      if (isNo(row[S.ubicacion])) out.ubicacionNo++;
+    } else {
+      out.sinSonda++;
+    }
+  }
+  return out;
 }
 
 function isFlag(val) {
@@ -961,10 +1070,12 @@ function publicSectorRow(slot) {
     viasEvaluables: slot.viasEvaluables,
     noEvaluablesVias: slot.noEvaluablesVias,
     uppUnicas: slot.uppUnicas,
+    sondasUnicas: slot.sondasUnicas,
     capacidad: slot.capacidad,
     conPeriferico: slot.conPeriferico,
     alertasVia: slot.alertasVia,
     conUpp: slot.conUpp,
+    conSonda: slot.conSonda,
     bradenAlto: slot.bradenAlto,
     rotuloIncompleto: slot.rotuloIncompleto,
     enfermeras: slot.enfermeras,
@@ -1121,7 +1232,7 @@ function viasAlertTipos(row) {
 
 function uppAlertTipos(row) {
   var tipos = [];
-  if (isYes(row[U.gradoIII]) || isYes(row[U.gradoIV])) tipos.push('UPP III-IV');
+  if (isYes(row[U.gradoIII]) || isYes(row[U.gradoIV])) tipos.push('LPP III-IV');
   if (bradenBand(row[U.braden]) === 'alto') tipos.push('Braden alto');
   return tipos;
 }
@@ -1322,10 +1433,12 @@ function emptySectorRow(sector) {
     viasEvaluables: 0,
     noEvaluablesVias: 0,
     uppUnicas: 0,
+    sondasUnicas: 0,
     capacidad: sectorCapacity(sector),
     conPeriferico: 0,
     alertasVia: 0,
     conUpp: 0,
+    conSonda: 0,
     bradenAlto: 0,
     rotuloIncompleto: 0,
     enfermeras: 0,
@@ -1334,7 +1447,8 @@ function emptySectorRow(sector) {
   };
 }
 
-function summarizeBySector(viasRows, uppRows, sectorFilter) {
+function summarizeBySector(viasRows, uppRows, sondasRows, sectorFilter) {
+  sondasRows = sondasRows || [];
   var list = sectorFilter ? [sectorFilter] : STATS_SECTORS.slice();
   var map = {};
   for (var s = 0; s < list.length; s++) {
@@ -1367,6 +1481,16 @@ function summarizeBySector(viasRows, uppRows, sectorFilter) {
     if (isYes(urow[U.uppSi])) uslot.conUpp++;
     if (bradenBand(urow[U.braden]) === 'alto') uslot.bradenAlto++;
     applyStaff(uslot, urow, U.fecha, U.enf, U.aux);
+  }
+
+  for (var kS = 0; kS < sondasRows.length; kS++) {
+    var srow = sondasRows[kS];
+    var ssec = cellStr(srow, S.sector);
+    if (!map[ssec]) map[ssec] = emptySectorRow(ssec);
+    var sslot = map[ssec];
+    sslot.sondasUnicas++;
+    if (isYes(srow[S.tiene])) sslot.conSonda++;
+    applyStaff(sslot, srow, S.fecha, S.enf, S.aux);
   }
 
   var out = [];

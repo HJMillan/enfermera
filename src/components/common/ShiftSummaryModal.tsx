@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, CheckCircle2, Download, Award, AlertCircle, Mail, Send, RefreshCw, Trash2, Sun } from 'lucide-react';
-import type { StoredRecord, AccesoPerifericoForm, UppForm } from '../../types/form';
+import type { StoredRecord, AccesoPerifericoForm, SondaVesicalForm, UppForm } from '../../types/form';
 import { exportRecordsToCSV, getNotificationEmails, clearStoredRecords } from '../../services/storageService';
 import { requestShiftSummaryEmail } from '../../services/webhookService';
 import { haptics } from '../../utils/haptics';
@@ -30,6 +30,8 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
 
   const viasRecords = records.filter((r) => r.formType === 'ACCESO_PERIFERICO');
   const uppRecords = records.filter((r) => r.formType === 'UPP');
+  const sondaRecords = records.filter((r) => r.formType === 'SONDA_VESICAL');
+  const sondasCon = sondaRecords.filter((r) => (r.data as SondaVesicalForm).tieneSonda === 'SI').length;
 
   const viasConAcceso = viasRecords.filter(
     (r) => (r.data as AccesoPerifericoForm).tieneAcceso
@@ -95,7 +97,7 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
         {/* Contenido */}
         <div className="p-4 overflow-y-auto space-y-4 text-sm">
           {/* Métricas Generales */}
-          <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
             <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-[var(--radius-md)] shadow-[var(--shadow-rest)] transition-[transform,box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-hover)] hover:-translate-y-0.5">
               <span className="text-2xl font-black text-slate-900 block">{records.length}</span>
               <span className="text-[11px] font-bold text-slate-600 uppercase">Total Registros</span>
@@ -108,7 +110,12 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
 
             <div className="bg-rose-50/80 border border-rose-100 p-3 rounded-[var(--radius-md)] shadow-[var(--shadow-rest)] transition-[transform,box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-hover)] hover:-translate-y-0.5">
               <span className="text-2xl font-black text-rose-800 block">{uppRecords.length}</span>
-              <span className="text-[11px] font-bold text-rose-700 uppercase">Camas UPP</span>
+              <span className="text-[11px] font-bold text-rose-700 uppercase">Camas LPP</span>
+            </div>
+
+            <div className="bg-teal-50/80 border border-teal-100 p-3 rounded-[var(--radius-md)] shadow-[var(--shadow-rest)] transition-[transform,box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-hover)] hover:-translate-y-0.5">
+              <span className="text-2xl font-black text-teal-800 block">{sondaRecords.length}</span>
+              <span className="text-[11px] font-bold text-teal-700 uppercase">Camas Sondas</span>
             </div>
           </div>
 
@@ -138,7 +145,7 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
             <div className="flex items-center justify-between">
               <span className="font-bold text-slate-800 text-xs uppercase flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-rose-600"></span>
-                Ronda 2: Úlceras por Presión
+                Ronda 2: Lesiones por presión
               </span>
               <span className="text-xs font-extrabold text-slate-700">{uppRecords.length} evaluadas</span>
             </div>
@@ -150,6 +157,26 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
               <div className="bg-slate-50 p-2 rounded-[var(--radius-sm)] flex justify-between items-center">
                 <span className="text-slate-600">Piel íntegra:</span>
                 <span className="font-bold text-emerald-800">{uppPielIntegra}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200/80 rounded-[var(--radius-md)] p-3.5 space-y-2 shadow-[var(--shadow-rest)]">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-slate-800 text-xs uppercase flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-teal-600"></span>
+                Ronda 3: Sondas vesicales
+              </span>
+              <span className="text-xs font-extrabold text-slate-700">{sondaRecords.length} evaluadas</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-slate-50 p-2 rounded-[var(--radius-sm)] flex justify-between items-center">
+                <span className="text-slate-600">Con sonda:</span>
+                <span className="font-bold text-teal-800">{sondasCon}</span>
+              </div>
+              <div className="bg-slate-50 p-2 rounded-[var(--radius-sm)] flex justify-between items-center">
+                <span className="text-slate-600">Sin sonda:</span>
+                <span className="font-bold text-slate-700">{sondaRecords.length - sondasCon}</span>
               </div>
             </div>
           </div>

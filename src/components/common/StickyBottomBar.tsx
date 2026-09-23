@@ -8,7 +8,7 @@ interface StickyBottomBarProps {
   habitacion: string;
   sector: string;
   hasCondition: boolean;
-  roundType: 'ACCESO_PERIFERICO' | 'UPP';
+  roundType: 'ACCESO_PERIFERICO' | 'UPP' | 'SONDA_VESICAL';
   altType?: string;
 }
 
@@ -23,11 +23,17 @@ export const StickyBottomBar: React.FC<StickyBottomBarProps> = ({
   altType,
 }) => {
   const isVias = roundType === 'ACCESO_PERIFERICO';
+  const isSondas = roundType === 'SONDA_VESICAL';
 
   let buttonText: string;
   let buttonBg: string;
 
-  if (isVias) {
+  if (isSondas) {
+    buttonText = hasCondition ? 'Guardar Sonda y +1 Cama' : 'Guardar (Sin sonda) y +1 Cama';
+    buttonBg = hasCondition
+      ? 'bg-teal-700 hover:bg-teal-800 shadow-teal-200 text-white'
+      : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200 text-white';
+  } else if (isVias) {
     if (hasCondition) {
       buttonText = 'Guardar Vía y +1 Cama';
       buttonBg = 'bg-sky-700 hover:bg-sky-800 shadow-sky-200 text-white';
@@ -44,7 +50,7 @@ export const StickyBottomBar: React.FC<StickyBottomBarProps> = ({
   } else {
     // UPP
     if (hasCondition) {
-      buttonText = 'Guardar UPP y +1 Cama';
+      buttonText = 'Guardar LPP y +1 Cama';
       buttonBg = 'bg-rose-700 hover:bg-rose-800 shadow-rose-200 text-white';
     } else {
       buttonText = 'Guardar (Piel Íntegra) y +1 Cama';

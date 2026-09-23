@@ -12,6 +12,7 @@ import {
   Syringe,
   Bandage,
   Building2,
+  Droplets,
 } from 'lucide-react';
 import { SECTORS } from '../../config/sectorConfig';
 import { getCurrentDateISO } from '../../utils/dateUtils';
@@ -146,9 +147,10 @@ const PRESETS: { id: StatsPreset; label: string }[] = [
 ];
 
 const RONDAS: { id: StatsRonda; label: string }[] = [
-  { id: 'ambas', label: 'Vías y piel' },
+  { id: 'ambas', label: 'Todas' },
   { id: 'vias', label: 'Solo vías' },
   { id: 'upp', label: 'Solo piel' },
+  { id: 'sondas', label: 'Solo sondas' },
 ];
 
 const VIA_UBIC: Record<string, string> = {
@@ -170,7 +172,8 @@ const ALERT_HINT: Record<string, string> = {
   Infiltración: 'La vía se salió hacia el tejido',
   Eritema: 'La piel alrededor está enrojecida',
   'Rótulo incompleto': 'Falta fecha, nombre, legajo, turno o ABB',
-  'UPP III-IV': 'Úlcera profunda: hay que priorizarla',
+  'LPP III-IV': 'Lesión profunda: hay que priorizarla',
+  'UPP III-IV': 'Lesión profunda: hay que priorizarla',
   'Braden alto': 'Alto riesgo de que aparezca o empeore una úlcera',
 };
 
@@ -205,20 +208,28 @@ function rename(label: string, dict: Record<string, string>): string {
   return dict[label] || label;
 }
 
+function displayAlertTipo(tipo: string): string {
+  return tipo === 'UPP III-IV' ? 'LPP III-IV' : tipo;
+}
+
 function groupAlertas(items: StatsAlerta[]): { tipo: string; count: number; hint: string }[] {
   const map = new Map<string, number>();
-  for (const a of items) map.set(a.tipo, (map.get(a.tipo) || 0) + 1);
+  for (const a of items) {
+    const tipo = displayAlertTipo(a.tipo);
+    map.set(tipo, (map.get(tipo) || 0) + 1);
+  }
   return [...map.entries()]
     .sort((a, b) => b[1] - a[1])
     .map(([tipo, count]) => ({ tipo, count, hint: ALERT_HINT[tipo] || '' }));
 }
 
 const VIA_ALERTS = new Set(['Infiltración', 'Eritema', 'Rótulo incompleto']);
-const UPP_ALERTS = new Set(['UPP III-IV', 'Braden alto']);
+const LPP_ALERTS = new Set(['LPP III-IV', 'UPP III-IV', 'Braden alto']);
 
 function alertasDeRonda(items: StatsAlerta[], ronda: StatsRonda): StatsAlerta[] {
   if (ronda === 'vias') return items.filter((a) => VIA_ALERTS.has(a.tipo));
-  if (ronda === 'upp') return items.filter((a) => UPP_ALERTS.has(a.tipo));
+  if (ronda === 'upp') return items.filter((a) => LPP_ALERTS.has(a.tipo));
+  if (ronda === 'sondas') return [];
   return items;
 }
 
@@ -295,14 +306,17 @@ export const StatsView: React.FC<StatsViewProps> = ({ hasWebhook }) => {
     bits.push(filters.sector ? `Sector ${filters.sector}` : 'Todos los sectores');
     if (filters.ronda === 'vias') bits.push('Solo vías');
     if (filters.ronda === 'upp') bits.push('Solo piel');
+    if (filters.ronda === 'sondas') bits.push('Solo sondas');
     if (extraCount) bits.push(`${extraCount} filtro${extraCount > 1 ? 's' : ''} extra`);
     return bits.join(' · ');
   }, [filters, extraCount]);
 
-  const showVias = filters.ronda !== 'upp';
-  const showUpp = filters.ronda !== 'vias';
+  const showVias = filters.ronda === 'ambas' || filters.ronda === 'vias';
+  const showUpp = filters.ronda === 'ambas' || filters.ronda === 'upp';
+  const showSondas = filters.ronda === 'ambas' || filters.ronda === 'sondas';
   const vias = data?.vias;
   const upp = data?.upp;
+  const sondas = data?.sondas;
   const cobertura = data?.cobertura;
   const showingStale = Boolean(error && data);
   const rotuloDen = vias ? vias.rotuloCompleto + vias.rotuloIncompleto : 0;
@@ -342,14 +356,25 @@ export const StatsView: React.FC<StatsViewProps> = ({ hasWebhook }) => {
       );
       parts.push(
         upp.conUpp
-          ? `${upp.conUpp} ${upp.conUpp === 1 ? 'tiene' : 'tienen'} úlcera por presión.`
+          ? `${upp.conUpp} ${upp.conUpp === 1 ? 'tiene' : 'tienen'} lesión por presión (LPP).`
           : 'Ninguna cama relevada tiene úlcera en este recorte.'
       );
       if (upp.bradenAlto) parts.push(`${upp.bradenAlto} con riesgo alto (Braden 12 o menos).`);
     }
+    if (showSondas && sondas && cobertura) {
+      const sondasUnicas = cobertura.sondasUnicas ?? sondas.evaluadas;
+      parts.push(
+        `En sondas se recorrieron ${sondasUnicas} cama${sondasUnicas === 1 ? '' : 's'}.`
+      );
+      parts.push(
+        sondas.conSonda
+          ? `${sondas.conSonda} ${sondas.conSonda === 1 ? 'tiene' : 'tienen'} sonda vesical.`
+          : 'Ninguna cama relevada tiene sonda en este recorte.'
+      );
+    }
     if (alertasTotal) parts.push(`${alertasTotal} aviso${alertasTotal === 1 ? '' : 's'} para revisar.`);
     return parts.join(' ');
-  }, [showVias, showUpp, vias, upp, cobertura, alertasTotal]);
+  }, [showVias, showUpp, showSondas, vias, upp, sondas, cobertura, alertasTotal]);
 
   if (!webhookReady) {
     return (
@@ -476,7 +501,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ hasWebhook }) => {
 
         <div>
           <span className="text-[11px] font-bold text-slate-600 uppercase mb-1.5 block">Qué ronda querés ver</span>
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
             {RONDAS.map((r) => (
               <button
                 key={r.id}
@@ -606,6 +631,14 @@ export const StatsView: React.FC<StatsViewProps> = ({ hasWebhook }) => {
                 value={cobertura.uppUnicas}
                 hint={`${cobertura.registrosUpp} carga${cobertura.registrosUpp === 1 ? '' : 's'} en el recorte`}
                 tone="rose"
+              />
+            )}
+            {showSondas && (
+              <CountTile
+                label="Camas de sondas"
+                value={cobertura.sondasUnicas ?? 0}
+                hint={`${cobertura.registrosSondas ?? 0} carga${(cobertura.registrosSondas ?? 0) === 1 ? '' : 's'} en el recorte`}
+                tone="sky"
               />
             )}
             <CountTile
@@ -779,8 +812,8 @@ export const StatsView: React.FC<StatsViewProps> = ({ hasWebhook }) => {
                   Cómo está la piel
                 </h3>
                 <SectionHelp>
-                  Úlcera por presión = lesión de la piel por quedar mucho tiempo en la misma posición. Cuanto más bajo
-                  el Braden, más riesgo (12 o menos es alto).
+                  LPP (lesión por presión) = daño de la piel por quedar mucho tiempo en la misma posición. Cuanto más
+                  bajo el Braden, más riesgo (12 o menos es alto).
                 </SectionHelp>
               </div>
               {upp.evaluadas === 0 ? (
@@ -920,6 +953,41 @@ export const StatsView: React.FC<StatsViewProps> = ({ hasWebhook }) => {
             </section>
           )}
 
+          {showSondas && sondas && (
+            <section className="bg-white p-4 rounded-[var(--radius-md)] border border-slate-200/80 shadow-[var(--shadow-rest)] space-y-4">
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5">
+                  <Droplets className="w-4 h-4 text-teal-700" />
+                  Cómo están las sondas
+                </h3>
+                <SectionHelp>
+                  Una cama, un dato: si se cargó más de una vez, cuenta la última. Sin alerta por mail en esta ronda.
+                </SectionHelp>
+              </div>
+              {sondas.evaluadas === 0 ? (
+                <p className="text-xs text-slate-600">No hay camas de sondas en este recorte del archivo.</p>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <CountTile label="Con sonda" value={sondas.conSonda} tone="sky" />
+                    <CountTile label="Sin sonda" value={sondas.sinSonda} tone="slate" />
+                    <CountTile label="2 lúmenes" value={sondas.lumenes2} tone="emerald" />
+                    <CountTile label="3 lúmenes" value={sondas.lumenes3} tone="amber" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <CountTile label="Con fijación" value={sondas.fijacionSi} hint="Sobre las que tienen sonda" tone="emerald" />
+                    <CountTile
+                      label="Ubicación no correcta"
+                      value={sondas.ubicacionNo}
+                      hint="Nefrectomía, Bricker o nada"
+                      tone={sondas.ubicacionNo ? 'amber' : 'slate'}
+                    />
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
           <section className="bg-white p-4 rounded-[var(--radius-md)] border border-slate-200/80 shadow-[var(--shadow-rest)] space-y-3">
             <div>
               <h3 className="font-extrabold text-slate-900 text-sm">Comparar sectores</h3>
@@ -930,6 +998,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ hasWebhook }) => {
                 (row) =>
                   row.viasUnicas === 0 &&
                   row.uppUnicas === 0 &&
+                  (row.sondasUnicas ?? 0) === 0 &&
                   row.enfermeras === 0 &&
                   row.auxiliares === 0
               ) && (
@@ -940,6 +1009,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ hasWebhook }) => {
                 const empty =
                   row.viasUnicas === 0 &&
                   row.uppUnicas === 0 &&
+                  (row.sondasUnicas ?? 0) === 0 &&
                   row.enfermeras === 0 &&
                   row.auxiliares === 0;
                 if (empty) return null;
@@ -984,6 +1054,14 @@ export const StatsView: React.FC<StatsViewProps> = ({ hasWebhook }) => {
                         value={row.bradenAlto}
                         total={row.uppUnicas || row.bradenAlto}
                         color="#be123c"
+                      />
+                    )}
+                    {showSondas && (
+                      <HBar
+                        label={`Con sonda (${row.conSonda ?? 0} de ${row.sondasUnicas ?? 0} camas)`}
+                        value={row.conSonda ?? 0}
+                        total={row.sondasUnicas ?? 0}
+                        color="#0f766e"
                       />
                     )}
                   </div>
@@ -1032,7 +1110,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ hasWebhook }) => {
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {(alertasVisibles)
-                        .filter((a) => a.tipo === g.tipo)
+                        .filter((a) => displayAlertTipo(a.tipo) === g.tipo)
                         .map((a, idx) => (
                           <span
                             key={`${a.tipo}-${a.sector}-${a.habitacion}-${a.cama}-${idx}`}

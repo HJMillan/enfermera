@@ -11,8 +11,11 @@ import {
   FileText,
   Sun,
   MapPin,
+  CalendarDays,
+  UserRound,
 } from 'lucide-react';
 import type { BasePatientData, SectorType, FormType, StoredRecord } from '../../types/form';
+import { composeFechaHora, parseFechaHora } from '../../utils/dateUtils';
 import {
   SECTORS,
   COMMON_BEDS,
@@ -94,6 +97,9 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
   };
 
   const isVias = activeRound === 'ACCESO_PERIFERICO';
+  const isLpp = activeRound === 'UPP';
+  const isSondas = activeRound === 'SONDA_VESICAL';
+  const fechaParts = parseFechaHora(patient.fechaHora);
   const sectorConfig = SECTOR_CONFIG[patient.sector];
   const isRoomValid = isValidRoom(patient.sector, patient.habitacion);
 
@@ -123,17 +129,38 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
             className={`flex items-center gap-1 text-xs font-bold px-2 py-0.5 md:py-1 rounded-[var(--radius-sm)] border shrink-0 ${
               isVias
                 ? 'bg-sky-50 text-sky-800 border-sky-200'
+                : isSondas
+                ? 'bg-teal-50 text-teal-800 border-teal-200'
                 : 'bg-rose-50 text-rose-800 border-rose-200'
             }`}
           >
-            <span>{isVias ? '💉' : '🩹'}</span>
-            <span className="hidden xs:inline">{isVias ? 'Ronda 1: ' : 'Ronda 2: '}</span>
-            <span>{isVias ? 'Vías' : 'UPP'}</span>
+            <span>{isVias ? '💉' : isSondas ? '🩺' : '🩹'}</span>
+            <span className="hidden xs:inline">
+              {isVias ? 'Ronda 1: ' : isLpp ? 'Ronda 2: ' : 'Ronda 3: '}
+            </span>
+            <span>{isVias ? 'Vías' : isSondas ? 'Sondas' : 'LPP'}</span>
           </div>
 
-          <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 md:py-1 rounded-[var(--radius-sm)] shrink-0">
+          <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 md:py-1 rounded-[var(--radius-sm)] shrink-0">
             <Clock className="w-3 h-3 text-slate-500" />
-            <span>{patient.fechaHora}</span>
+            <input
+              type="date"
+              aria-label="Fecha del registro"
+              value={fechaParts.date}
+              onChange={(e) =>
+                onChange({ fechaHora: composeFechaHora(e.target.value, fechaParts.time) })
+              }
+              className="bg-transparent font-semibold text-[11px] text-slate-700 outline-none w-[7.4rem]"
+            />
+            <input
+              type="time"
+              aria-label="Hora del registro"
+              value={fechaParts.time}
+              onChange={(e) =>
+                onChange({ fechaHora: composeFechaHora(fechaParts.date, e.target.value) })
+              }
+              className="bg-transparent font-semibold text-[11px] text-slate-700 outline-none w-[4.2rem]"
+            />
           </div>
 
           {/* Wake Lock Screen Indicator */}
@@ -384,6 +411,54 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
             ))}
           </div>
 
+        </div>
+      </div>
+
+      <div className="grid grid-cols-12 gap-1.5 md:gap-2 mt-1.5">
+        <div className="col-span-12 sm:col-span-6 flex items-center bg-slate-50 border border-slate-200 rounded-[var(--radius-sm)] px-2 py-1 focus-within:border-sky-500 focus-within:bg-white focus-within:ring-1 focus-within:ring-sky-100">
+          <CalendarDays className="w-3.5 h-3.5 text-slate-500 mr-1.5 shrink-0" />
+          <div className="flex flex-col flex-1 min-w-0">
+            <span className="text-[11px] md:text-xs uppercase font-bold text-slate-600 leading-tight">
+              Fecha de ingreso
+            </span>
+            <input
+              type="date"
+              aria-label="Fecha de ingreso del paciente"
+              value={patient.fechaIngreso || ''}
+              onChange={(e) => onChange({ fechaIngreso: e.target.value })}
+              className="w-full bg-transparent font-bold text-xs md:text-sm text-slate-800 outline-none p-0 min-h-[22px]"
+            />
+          </div>
+        </div>
+
+        <div className="col-span-12 sm:col-span-6 flex items-center justify-between bg-slate-50 border border-slate-200 rounded-[var(--radius-sm)] px-2 py-1">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <UserRound className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            <span className="text-[11px] md:text-xs uppercase font-bold text-slate-600 shrink-0">
+              Sexo:
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {(
+              [
+                { id: 'M' as const, label: 'Masculino' },
+                { id: 'F' as const, label: 'Femenino' },
+              ]
+            ).map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => onChange({ sexo: opt.id })}
+                className={`min-h-9 px-3 rounded-[var(--radius-sm)] font-bold text-xs border transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer ${
+                  patient.sexo === opt.id
+                    ? 'bg-sky-700 text-white border-sky-700 shadow-[var(--shadow-rest)]'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

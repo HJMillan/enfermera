@@ -7,6 +7,7 @@ import {
   Clock,
   Syringe,
   Bandage,
+  Droplets,
   ChevronDown,
   ChevronUp,
   Trash2,
@@ -22,7 +23,8 @@ import {
   X,
   Users,
 } from 'lucide-react';
-import type { StoredRecord, AccesoPerifericoForm, UppForm } from '../../types/form';
+import type { StoredRecord, AccesoPerifericoForm, SondaVesicalForm, UppForm } from '../../types/form';
+import { formatIsoDateDisplay } from '../../utils/dateUtils';
 import { retryRecordSync } from '../../services/webhookService';
 import { exportRecordsToCSV, deleteRecordLocally, clearStoredRecords } from '../../services/storageService';
 
@@ -42,7 +44,7 @@ interface HistoryViewProps {
 }
 
 export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) => {
-  const [filter, setFilter] = useState<'ALL' | 'ACCESO_PERIFERICO' | 'UPP'>('ALL');
+  const [filter, setFilter] = useState<'ALL' | 'ACCESO_PERIFERICO' | 'UPP' | 'SONDA_VESICAL'>('ALL');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -130,7 +132,11 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
               },
               {
                 id: 'UPP' as const,
-                label: `UPP (${records.filter((r) => r.formType === 'UPP').length})`,
+                label: `LPP (${records.filter((r) => r.formType === 'UPP').length})`,
+              },
+              {
+                id: 'SONDA_VESICAL' as const,
+                label: `Sondas (${records.filter((r) => r.formType === 'SONDA_VESICAL').length})`,
               },
             ] as const
           ).map((item) => (
@@ -156,16 +162,30 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
           <Clock className="w-10 h-10 text-slate-300 mx-auto" />
           <p className="font-bold text-slate-700 text-sm">No hay registros cargados aún</p>
           <p className="text-xs text-slate-600">
-            Comienza cargando pacientes en la pestaña de Acceso Periférico o UPP.
+            Comienza cargando pacientes en Vías, LPP o Sondas.
           </p>
         </div>
       ) : (
         <div className="space-y-2.5">
           {filtered.map((item) => {
             const isAcceso = item.formType === 'ACCESO_PERIFERICO';
+            const isUpp = item.formType === 'UPP';
+            const isSonda = item.formType === 'SONDA_VESICAL';
             const isExpanded = expandedId === item.id;
             const dataAcceso = isAcceso ? (item.data as AccesoPerifericoForm) : null;
-            const dataUpp = !isAcceso ? (item.data as UppForm) : null;
+            const dataUpp = isUpp ? (item.data as UppForm) : null;
+            const dataSonda = isSonda ? (item.data as SondaVesicalForm) : null;
+            const sexoLabel = item.data.sexo === 'M' ? 'Masculino' : item.data.sexo === 'F' ? 'Femenino' : '';
+            const motivoSondaLabel =
+              dataSonda?.ubicacionMotivo === 'nefrectomia_derecha'
+                ? 'Nefrectomía derecha'
+                : dataSonda?.ubicacionMotivo === 'nefrectomia_izquierda'
+                ? 'Nefrectomía izquierda'
+                : dataSonda?.ubicacionMotivo === 'bricker'
+                ? 'Bricker'
+                : dataSonda?.ubicacionMotivo === 'nada'
+                ? 'Nada'
+                : '';
 
             const ubicacionesAccesoList = dataAcceso
               ? [
@@ -201,7 +221,9 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
               ? [
                   dataAcceso.fijacionTegaderm && 'Tegaderm',
                   dataAcceso.fijacionCinta &&
-                    (dataAcceso.fijacionCintaTipo
+                    (dataAcceso.fijacionCintaTipo === 'transparente'
+                      ? 'Cinta transparente'
+                      : dataAcceso.fijacionCintaTipo
                       ? `Cinta (${dataAcceso.fijacionCintaTipo})`
                       : 'Cinta'),
                   dataAcceso.fijacionHipafix && 'Hipafix',
@@ -266,10 +288,20 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                   <div className="flex items-center gap-3">
                     <div
                       className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                        isAcceso ? 'bg-sky-100 text-sky-700' : 'bg-rose-100 text-rose-700'
+                        isAcceso
+                          ? 'bg-sky-100 text-sky-700'
+                          : isSonda
+                          ? 'bg-teal-100 text-teal-700'
+                          : 'bg-rose-100 text-rose-700'
                       }`}
                     >
-                      {isAcceso ? <Syringe className="w-5 h-5" /> : <Bandage className="w-5 h-5" />}
+                      {isAcceso ? (
+                        <Syringe className="w-5 h-5" />
+                      ) : isSonda ? (
+                        <Droplets className="w-5 h-5" />
+                      ) : (
+                        <Bandage className="w-5 h-5" />
+                      )}
                     </div>
 
                     <div className="min-w-0 flex-1">
@@ -294,6 +326,12 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                                 : dataAcceso?.tipoAccesoAlternativo === 'percutaneo'
                                 ? 'bg-purple-100 text-purple-800'
                                 : 'bg-slate-100 text-slate-600'
+                              : isSonda
+                              ? dataSonda?.tieneSonda === 'SI'
+                                ? 'bg-teal-100 text-teal-800'
+                                : dataSonda?.motivoAusente
+                                ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                : 'bg-slate-100 text-slate-600'
                               : dataUpp?.tieneUpp
                               ? 'bg-rose-100 text-rose-800'
                               : dataUpp?.motivoAusente
@@ -313,8 +351,12 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                               : dataAcceso?.tipoAccesoAlternativo === 'percutaneo'
                               ? 'Percutáneo'
                               : 'Sin Vía'
+                            : isSonda
+                            ? dataSonda?.tieneSonda === 'SI'
+                              ? `Sonda Fr ${dataSonda.numeroSonda || '?'}`
+                              : dataSonda?.motivoAusente || 'Sin sonda'
                             : dataUpp?.tieneUpp
-                            ? 'Con UPP'
+                            ? 'Con LPP'
                             : dataUpp?.motivoAusente
                             ? dataUpp.motivoAusente
                             : 'Piel Íntegra'}
@@ -323,11 +365,18 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
 
                       <div className="text-[11px] text-slate-600 flex items-center gap-2 mt-0.5">
                         <span>{item.data.fechaHora}</span>
+                        {sexoLabel && <span>· {sexoLabel}</span>}
+                        {item.data.fechaIngreso && (
+                          <span>· Ingreso {formatIsoDateDisplay(item.data.fechaIngreso)}</span>
+                        )}
                         {isAcceso && dataAcceso?.tieneAcceso && ubicacionesAcceso && (
                           <span>· Ubic: {ubicacionesAcceso}</span>
                         )}
-                        {!isAcceso && dataUpp?.tieneUpp && (
+                        {isUpp && dataUpp?.tieneUpp && (
                           <span>· Braden: {dataUpp.escalaBraden} pts</span>
+                        )}
+                        {isSonda && dataSonda?.tieneSonda === 'SI' && dataSonda.lumenes && (
+                          <span>· {dataSonda.lumenes} lúmenes</span>
                         )}
                       </div>
                     </div>
@@ -377,7 +426,11 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
                           <span className="font-extrabold text-slate-800 text-xs">
-                            {isAcceso ? 'Acceso Periférico' : 'Úlcera por Presión (UPP)'}
+                            {isAcceso
+                              ? 'Acceso Periférico'
+                              : isSonda
+                              ? 'Sonda vesical'
+                              : 'Lesión por presión (LPP)'}
                           </span>
                           <span className="text-[10px] font-mono text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
                             ID: {item.id}
@@ -541,12 +594,12 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                             </div>
                           </div>
 
-                          {/* C. Lúmenes y Conectores */}
+                          {/* C. Conectores */}
                           <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-xs space-y-2">
                             <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
                               <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
                                 <Layers className="w-3.5 h-3.5 text-sky-700" />
-                                Lúmenes / Conectores
+                                Conectores
                               </span>
                             </div>
 
@@ -728,8 +781,51 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                       </div>
                     )}
 
+                    {isSonda && dataSonda && (
+                      <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                            <Droplets className="w-3.5 h-3.5 text-teal-700" />
+                            Sonda vesical
+                          </span>
+                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-teal-50 text-teal-800 border border-teal-200">
+                            {dataSonda.tieneSonda === 'SI' ? 'Con sonda' : dataSonda.motivoAusente || 'Sin sonda'}
+                          </span>
+                        </div>
+                        {dataSonda.tieneSonda === 'SI' && (
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <span className="text-[11px] font-bold text-slate-600 block">Fr:</span>
+                              <span className="font-semibold text-slate-800">{dataSonda.numeroSonda || '-'}</span>
+                            </div>
+                            <div>
+                              <span className="text-[11px] font-bold text-slate-600 block">Lúmenes:</span>
+                              <span className="font-semibold text-slate-800">{dataSonda.lumenes || '-'}</span>
+                            </div>
+                            <div>
+                              <span className="text-[11px] font-bold text-slate-600 block">Fijación:</span>
+                              <span className="font-semibold text-slate-800">{dataSonda.fijacion || '-'}</span>
+                            </div>
+                            <div>
+                              <span className="text-[11px] font-bold text-slate-600 block">Ubicación:</span>
+                              <span className="font-semibold text-slate-800">
+                                {dataSonda.ubicacionCorrecta === 'NO'
+                                  ? `NO${motivoSondaLabel ? ` (${motivoSondaLabel})` : ''}`
+                                  : dataSonda.ubicacionCorrecta || '-'}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        {dataSonda.observaciones && (
+                          <div className="text-xs text-slate-700 italic bg-slate-50 p-2 rounded border border-slate-200">
+                            Observaciones: {dataSonda.observaciones}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* CASO 3: Úlcera por Presión (UPP) Activa */}
-                    {!isAcceso && dataUpp && dataUpp.tieneUpp && (
+                    {isUpp && dataUpp && dataUpp.tieneUpp && (
                       <div className="space-y-2.5">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                           {/* A. Ingreso y Procedencia */}
@@ -746,7 +842,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                                   Fecha Ingreso:
                                 </span>
                                 <span className="font-semibold text-slate-800">
-                                  {dataUpp.fechaIngreso || '-'}
+                                  {dataUpp.fechaIngreso ? formatIsoDateDisplay(dataUpp.fechaIngreso) : '-'}
                                 </span>
                               </div>
                               <div>
@@ -930,7 +1026,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                     )}
 
                     {/* CASO 4: Sin UPP / Piel Íntegra */}
-                    {!isAcceso && dataUpp && !dataUpp.tieneUpp && (
+                    {isUpp && dataUpp && !dataUpp.tieneUpp && (
                       <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-xs space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="font-bold text-slate-800 text-xs">
@@ -939,7 +1035,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                           <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
                             {dataUpp.motivoAusente
                               ? `Cama / Paciente: ${dataUpp.motivoAusente}`
-                              : 'Piel Íntegra / Sin UPP'}
+                              : 'Piel Íntegra / Sin LPP'}
                           </span>
                         </div>
                         {dataUpp.observaciones && (

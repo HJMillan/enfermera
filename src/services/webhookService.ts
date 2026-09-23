@@ -1,6 +1,6 @@
-import type { FormType, AccesoPerifericoForm, UppForm, StoredRecord } from '../types/form';
+import type { FormType, AccesoPerifericoForm, SondaVesicalForm, UppForm, StoredRecord } from '../types/form';
 import type { StatsFilters, StatsPayload } from '../types/stats';
-import { mapAccesoPerifericoToRow, mapUppToRow } from './sheetMapper';
+import { mapAccesoPerifericoToRow, mapSondaToRow, mapUppToRow } from './sheetMapper';
 import {
   getStoredWebhookUrl,
   saveRecordLocally,
@@ -19,11 +19,13 @@ export interface SubmitResult {
 
 export async function submitPatientRecord(
   formType: FormType,
-  data: AccesoPerifericoForm | UppForm
+  data: AccesoPerifericoForm | UppForm | SondaVesicalForm
 ): Promise<SubmitResult> {
   const rowValues =
     formType === 'ACCESO_PERIFERICO'
       ? mapAccesoPerifericoToRow(data as AccesoPerifericoForm)
+      : formType === 'SONDA_VESICAL'
+      ? mapSondaToRow(data as SondaVesicalForm)
       : mapUppToRow(data as UppForm);
 
   const recordId = 'rec_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);

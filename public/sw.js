@@ -1,9 +1,9 @@
 /**
  * PLANILLA ENFERMERA - Service Worker (Offline First)
- * Caché v1.1.0 — al publicar, bump CACHE_NAME junto con APP_VERSION.
+ * Caché v1.2.0 — al publicar, bump CACHE_NAME junto con APP_VERSION.
  */
 
-const CACHE_NAME = 'planilla-enfermera-v1.1.0';
+const CACHE_NAME = 'planilla-enfermera-v1.2.0';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

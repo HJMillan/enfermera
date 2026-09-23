@@ -1,4 +1,4 @@
-export type StatsRonda = 'ambas' | 'vias' | 'upp';
+export type StatsRonda = 'ambas' | 'vias' | 'upp' | 'sondas';
 export type StatsPreset = 'hoy' | 'ayer' | '7d' | 'mes' | 'rango' | 'todo';
 
 export interface StatsFilters {
@@ -26,10 +26,12 @@ export interface StatsSectorRow {
   viasEvaluables?: number;
   noEvaluablesVias?: number;
   uppUnicas: number;
+  sondasUnicas?: number;
   capacidad: number;
   conPeriferico: number;
   alertasVia: number;
   conUpp: number;
+  conSonda?: number;
   bradenAlto: number;
   rotuloIncompleto: number;
   enfermeras: number;
@@ -64,6 +66,16 @@ export interface StatsViasBlock {
   ubicaciones: StatsCountItem[];
 }
 
+export interface StatsSondasBlock {
+  evaluadas: number;
+  conSonda: number;
+  sinSonda: number;
+  lumenes2: number;
+  lumenes3: number;
+  fijacionSi: number;
+  ubicacionNo: number;
+}
+
 export interface StatsUppBlock {
   evaluadas: number;
   conUpp: number;
@@ -94,8 +106,10 @@ export interface StatsPayload {
   cobertura?: {
     registrosVias: number;
     registrosUpp: number;
+    registrosSondas?: number;
     viasUnicas: number;
     uppUnicas: number;
+    sondasUnicas?: number;
     noEvaluablesVias: number;
     noEvaluablesUpp: number;
     capacidad: number;
@@ -103,6 +117,7 @@ export interface StatsPayload {
   };
   vias?: StatsViasBlock;
   upp?: StatsUppBlock;
+  sondas?: StatsSondasBlock;
   alertas?: StatsAlerta[];
   alertasTotal?: number;
 }

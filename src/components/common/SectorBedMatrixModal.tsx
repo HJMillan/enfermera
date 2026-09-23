@@ -44,6 +44,7 @@ export const SectorBedMatrixModal: React.FC<SectorBedMatrixModalProps> = ({
   const progressPercent = totalBeds > 0 ? Math.round((censadasCount / totalBeds) * 100) : 0;
 
   const isVias = activeRound === 'ACCESO_PERIFERICO';
+  const isSondas = activeRound === 'SONDA_VESICAL';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-950/60 backdrop-blur-md transition-opacity duration-[var(--duration-base)] ease-[var(--ease-smooth)]">
@@ -53,6 +54,8 @@ export const SectorBedMatrixModal: React.FC<SectorBedMatrixModalProps> = ({
           className={`p-4 border-b text-white flex items-center justify-between ${
             isVias
               ? 'bg-gradient-to-r from-sky-700 to-cyan-700 border-sky-800'
+              : isSondas
+              ? 'bg-gradient-to-r from-teal-700 to-emerald-700 border-teal-800'
               : 'bg-gradient-to-r from-rose-700 to-pink-700 border-rose-800'
           }`}
         >
@@ -65,7 +68,7 @@ export const SectorBedMatrixModal: React.FC<SectorBedMatrixModalProps> = ({
                 Mapa de Camas · Sector {sector}
               </h2>
               <p className="text-xs text-white/80">
-                {isVias ? 'Ronda 1: Vías Periféricas' : 'Ronda 2: UPP'}
+                {isVias ? 'Ronda 1: Vías Periféricas' : isSondas ? 'Ronda 3: Sondas vesicales' : 'Ronda 2: LPP'}
               </p>
             </div>
           </div>
@@ -93,7 +96,7 @@ export const SectorBedMatrixModal: React.FC<SectorBedMatrixModalProps> = ({
           <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
             <div
               className={`h-full transition-all duration-[var(--duration-slow)] ease-[var(--ease-standard)] ${
-                isVias ? 'bg-sky-600' : 'bg-rose-600'
+                isVias ? 'bg-sky-600' : isSondas ? 'bg-teal-600' : 'bg-rose-600'
               }`}
               style={{ width: `${progressPercent}%` }}
             />
