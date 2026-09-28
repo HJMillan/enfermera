@@ -7,6 +7,8 @@ export type SectorType =
   | 'C'
   | 'D'
   | 'E'
+  | 'UCE'
+  | 'RCA'
   | string;
 
 export type SexoPaciente = 'M' | 'F' | '';

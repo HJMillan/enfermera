@@ -1,12 +1,15 @@
 import React from 'react';
 import { ChevronDown, Hotel, X } from 'lucide-react';
 import { BED_STATUS_OPTIONS } from '../../config/bedStatus';
+import { formatPlace } from '../../config/sectorConfig';
+import type { SectorType } from '../../types/form';
 
 interface BedStatusSelectorProps {
   value: string;
   onChange: (status: string) => void;
   cama: string;
   habitacion: string;
+  sector: SectorType;
 }
 
 export const BedStatusSelector: React.FC<BedStatusSelectorProps> = ({
@@ -14,6 +17,7 @@ export const BedStatusSelector: React.FC<BedStatusSelectorProps> = ({
   onChange,
   cama,
   habitacion,
+  sector,
 }) => {
   const isSpecialStatus = Boolean(value);
 
@@ -30,7 +34,7 @@ export const BedStatusSelector: React.FC<BedStatusSelectorProps> = ({
         <div className="flex items-center gap-1.5 min-w-0">
           <Hotel className={`w-4 h-4 shrink-0 transition-colors duration-[var(--duration-fast)] ease-[var(--ease-smooth)] ${isSpecialStatus ? 'text-amber-600' : 'text-sky-700'}`} />
           <span className="text-xs font-bold text-slate-700 truncate">
-            Estado de la Cama <strong className="text-slate-900 font-extrabold">{cama}</strong> (Hab {habitacion})
+            Estado · <strong className="text-slate-900 font-extrabold">{formatPlace(sector, habitacion, cama)}</strong>
           </span>
         </div>
 

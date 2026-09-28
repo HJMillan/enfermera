@@ -14,12 +14,12 @@ import {
   Building2,
   Droplets,
 } from 'lucide-react';
-import { SECTORS } from '../../config/sectorConfig';
+import { SECTORS, formatPlace } from '../../config/sectorConfig';
 import { getCurrentDateISO } from '../../utils/dateUtils';
 import { getStoredWebhookUrl } from '../../services/storageService';
 import { fetchSheetStatistics } from '../../services/webhookService';
 import { APP_VERSION, SCRIPT_VERSION } from '../../config/version';
-import type { StatsAlerta, StatsFilters, StatsPayload, StatsPreset, StatsRonda } from '../../types/stats';
+import type { StatsAlerta, StatsFilters, StatsPayload, StatsPreset, StatsRonda, StatsYn } from '../../types/stats';
 import { CountTile, Donut, HBar, SectionHelp, StackedBar, pct } from './StatsCharts';
 
 const FILTERS_KEY = 'pe_stats_filters_v1';
@@ -231,6 +231,45 @@ function alertasDeRonda(items: StatsAlerta[], ronda: StatsRonda): StatsAlerta[] 
   if (ronda === 'upp') return items.filter((a) => LPP_ALERTS.has(a.tipo));
   if (ronda === 'sondas') return [];
   return items;
+}
+
+function RespuestaBar({ item }: { item: StatsYn }) {
+  const den = item.si + item.no + item.vacio;
+  if (!den) return null;
+  const parts = [
+    { label: 'Sí', value: item.si, color: '#059669' },
+    { label: 'No', value: item.no, color: '#e11d48' },
+    { label: 'Vacío', value: item.vacio, color: '#94a3b8' },
+  ];
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[11px] font-extrabold text-slate-800">{item.label}</p>
+      <div className="flex h-4 rounded-full overflow-hidden bg-slate-100 ring-1 ring-slate-200/80">
+        {parts.map((s) => {
+          if (!s.value) return null;
+          return (
+            <div
+              key={s.label}
+              className="h-full min-w-0"
+              style={{ width: `${(s.value / den) * 100}%`, background: s.color }}
+              title={`${s.label}: ${s.value}`}
+            />
+          );
+        })}
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-1">
+        {parts.map((s) => (
+          <span key={s.label} className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
+            {s.label}{' '}
+            <span className="font-extrabold text-slate-900">
+              {s.value} ({pct(s.value, den)}%)
+            </span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 interface StatsViewProps {
@@ -702,7 +741,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ hasWebhook }) => {
                   {rotuloDen > 0 && (
                     <div className="space-y-2">
                       <p className="text-xs font-extrabold text-slate-800">Rótulo de la vía</p>
-                      <SectionHelp>Completo = fecha, nombre, legajo, turno y ABB.</SectionHelp>
+                      <SectionHelp>Completo = fecha, enfermero, legajo, turno y ABB.</SectionHelp>
                       <StackedBar
                         total={rotuloDen}
                         segments={[
@@ -710,6 +749,19 @@ export const StatsView: React.FC<StatsViewProps> = ({ hasWebhook }) => {
                           { label: 'Falta algún dato', value: vias.rotuloIncompleto, color: '#d97706' },
                         ]}
                       />
+                    </div>
+                  )}
+
+                  {(vias.respuestas || []).some((r) => r.si + r.no + r.vacio > 0) && (
+                    <div className="space-y-3">
+                      <p className="text-xs font-extrabold text-slate-800">Rótulo y visibilidad: sí, no y vacío</p>
+                      <SectionHelp>
+                        Cada barra cuenta las camas donde esa pregunta correspondía. Vacío es cuando correspondía y no
+                        se marcó sí ni no.
+                      </SectionHelp>
+                      {(vias.respuestas || []).map((item) => (
+                        <RespuestaBar key={item.label} item={item} />
+                      ))}
                     </div>
                   )}
 
@@ -1116,7 +1168,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ hasWebhook }) => {
                             key={`${a.tipo}-${a.sector}-${a.habitacion}-${a.cama}-${idx}`}
                             className="text-[11px] font-bold text-slate-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1"
                           >
-                            {a.sector} · Hab {a.habitacion} · Cama {a.cama}
+                            {a.sector} · {formatPlace(a.sector, a.habitacion, a.cama)}
                           </span>
                         ))}
                     </div>

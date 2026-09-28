@@ -11,7 +11,7 @@ import {
   getStaffBySector,
   deleteRecordLocally,
 } from './services/storageService';
-import { MAX_BEDS } from './config/sectorConfig';
+import { stepBed, formatPlace } from './config/sectorConfig';
 import { APP_VERSION } from './config/version';
 
 import { submitPatientRecord } from './services/webhookService';
@@ -92,12 +92,13 @@ export default function App() {
 
   const afterSuccessfulSave = (prevCama: string) => {
     setFechaHoraTouched(false);
-    const currentBed = parseInt(prevCama, 10);
     setPatient((prev) => {
+      const nextPlace = stepBed(prev.sector, prev.habitacion, prevCama, 1);
       const next = {
         ...prev,
         fechaHora: formatCurrentDateTime(),
-        cama: !isNaN(currentBed) ? String(Math.min(MAX_BEDS, currentBed + 1)) : prev.cama,
+        habitacion: nextPlace.habitacion,
+        cama: nextPlace.cama,
         sexo: '' as const,
         fechaIngreso: '',
         historiaClinica: '',
@@ -107,14 +108,13 @@ export default function App() {
     });
   };
 
-  // Botón rápido: Siguiente Cama (+1)
+  // Botón rápido: siguiente cama, o siguiente box/sillón en RCA
   const handleNextBed = useCallback(() => {
-    const currentBed = parseInt(patient.cama, 10);
-    const nextBed = isNaN(currentBed) ? 1 : Math.min(MAX_BEDS, currentBed + 1);
-    handlePatientChange({ cama: String(nextBed) });
+    const next = stepBed(patient.sector, patient.habitacion, patient.cama, 1);
+    handlePatientChange(next);
     setToast({
       type: 'success',
-      message: `Avanzado a Cama ${nextBed} (Sector ${patient.sector} Hab ${patient.habitacion})`,
+      message: `Avanzado a ${formatPlace(patient.sector, next.habitacion, next.cama)} (Sector ${patient.sector})`,
     });
     haptics.light();
   }, [patient.cama, patient.sector, patient.habitacion, handlePatientChange]);
@@ -134,16 +134,16 @@ export default function App() {
         handleNextBed();
       } else if (e.key === '-') {
         e.preventDefault();
-        const current = parseInt(patient.cama, 10);
-        if (!isNaN(current) && current > 1) {
-          handlePatientChange({ cama: String(current - 1) });
+        const prev = stepBed(patient.sector, patient.habitacion, patient.cama, -1);
+        if (prev.habitacion !== patient.habitacion || prev.cama !== patient.cama) {
+          handlePatientChange(prev);
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTab, handleNextBed, handlePatientChange, patient.cama]);
+  }, [activeTab, handleNextBed, handlePatientChange, patient.cama, patient.habitacion, patient.sector]);
 
   // Función para deshacer el último registro guardado
   const handleUndo = useCallback(
@@ -155,7 +155,7 @@ export default function App() {
       setFechaHoraTouched(true);
       setToast({
         type: 'warning',
-        message: `↩️ Registro deshecho. Vuelto a Sec ${prevPatient.sector} Hab ${prevPatient.habitacion} Cama ${prevPatient.cama}`,
+        message: `↩️ Registro deshecho. Vuelto a Sec ${prevPatient.sector} · ${formatPlace(prevPatient.sector, prevPatient.habitacion, prevPatient.cama)}`,
       });
       haptics.warning();
     },
@@ -179,7 +179,7 @@ export default function App() {
 
     setToast({
       type: 'success',
-      message: `✅ Vía: Sec ${formData.sector} Hab ${formData.habitacion} Cama ${formData.cama} (${situacionTexto})`,
+      message: `✅ Vía: Sec ${formData.sector} · ${formatPlace(formData.sector, formData.habitacion, formData.cama)} (${situacionTexto})`,
       action: res.recordId
         ? {
             label: 'Deshacer',
@@ -207,7 +207,7 @@ export default function App() {
 
     setToast({
       type: 'success',
-      message: `✅ LPP: Sec ${formData.sector} Hab ${formData.habitacion} Cama ${formData.cama} (${situacionUppTexto})`,
+      message: `✅ LPP: Sec ${formData.sector} · ${formatPlace(formData.sector, formData.habitacion, formData.cama)} (${situacionUppTexto})`,
       action: res.recordId
         ? {
             label: 'Deshacer',
@@ -232,7 +232,7 @@ export default function App() {
 
     setToast({
       type: 'success',
-      message: `✅ Sonda: Sec ${formData.sector} Hab ${formData.habitacion} Cama ${formData.cama} (${situacionSonda})`,
+      message: `✅ Sonda: Sec ${formData.sector} · ${formatPlace(formData.sector, formData.habitacion, formData.cama)} (${situacionSonda})`,
       action: res.recordId
         ? {
             label: 'Deshacer',

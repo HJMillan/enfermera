@@ -1,6 +1,6 @@
 /**
  * PLANILLA ENFERMERA - Google Apps Script (Producción)
- * Versión: 1.2.0 — Sondas vesicales + fecha/sexo/ingreso compartidos
+ * Versión: 1.2.2 — Rótulo y visibilidad: sí, no, o vacío solo si la pregunta correspondía
  *
  * Endpoint Webhook para inserción automática en Google Sheets,
  * estadísticas de lectura del archivo y reporte de Cierre de Turno.
@@ -17,7 +17,7 @@
 var SPREADSHEET_ID = '';
 
 /** Debe coincidir con SCRIPT_VERSION en src/config/version.ts */
-var SCRIPT_VERSION = '1.2.0';
+var SCRIPT_VERSION = '1.2.2';
 
 var DEFAULT_RECIPIENTS = ['jesusmillan86@gmail.com', 'pamelaestua91@gmail.com'];
 
@@ -869,7 +869,12 @@ var SECTOR_ROOM_CONFIG = {
   'E': { min: 262, max: 277, exclusions: [] }
 };
 
-var STATS_SECTORS = ['PB', '1° Piso', 'Maternidad', 'A', 'B', 'C', 'D', 'E'];
+var SECTOR_PLACE_CAPACITY = {
+  'UCE': 8,
+  'RCA': 16
+};
+
+var STATS_SECTORS = ['PB', '1° Piso', 'Maternidad', 'A', 'B', 'C', 'D', 'E', 'UCE', 'RCA'];
 
 var SPECIAL_BED_STATUSES = ['Libre', 'Quimio', 'Quirófano', 'Diálisis', 'Estudio / Rayos', 'Traslado'];
 
@@ -1119,12 +1124,20 @@ function countRooms(cfg) {
 
 function sectorCapacity(sector) {
   if (sector) {
+    if (Object.prototype.hasOwnProperty.call(SECTOR_PLACE_CAPACITY, sector)) {
+      return SECTOR_PLACE_CAPACITY[sector];
+    }
     return SECTOR_ROOM_CONFIG[sector] ? countRooms(SECTOR_ROOM_CONFIG[sector]) * 4 : 0;
   }
   var total = 0;
   for (var k in SECTOR_ROOM_CONFIG) {
-    if (SECTOR_ROOM_CONFIG.hasOwnProperty(k)) {
+    if (Object.prototype.hasOwnProperty.call(SECTOR_ROOM_CONFIG, k)) {
       total += countRooms(SECTOR_ROOM_CONFIG[k]) * 4;
+    }
+  }
+  for (var p in SECTOR_PLACE_CAPACITY) {
+    if (Object.prototype.hasOwnProperty.call(SECTOR_PLACE_CAPACITY, p)) {
+      total += SECTOR_PLACE_CAPACITY[p];
     }
   }
   return total;
@@ -1206,6 +1219,7 @@ function rotuloApplies(row) {
 
 function rotuloStatus(row) {
   if (!rotuloApplies(row)) return 'na';
+  if (!ynCell(row[V.rotulo])) return 'na';
   if (!isYes(row[V.rotulo])) return 'incompleto';
   var enfOk = isYes(row[V.rotEnf]) || isYes(row[V.rotNombre]);
   if (isYes(row[V.rotFecha]) && enfOk && isYes(row[V.rotLegajo]) && isYes(row[V.rotTurno]) && isYes(row[V.rotAbb])) {
@@ -1249,6 +1263,70 @@ function mapToItems(map) {
   }
   items.sort(function (a, b) { return b.count - a.count; });
   return items;
+}
+
+function ynCell(val) {
+  if (isYes(val)) return 'si';
+  if (isNo(val)) return 'no';
+  return '';
+}
+
+function rotuloItemApplies(row) {
+  return rotuloApplies(row) && isYes(row[V.rotulo]);
+}
+
+function readEnfermeroRotulo(row) {
+  var enf = ynCell(row[V.rotEnf]);
+  if (enf) return enf;
+  return ynCell(row[V.rotNombre]);
+}
+
+function readVisibilidad(row) {
+  if (isYes(row[V.visSi])) return 'si';
+  if (isNo(row[V.visNo])) return 'no';
+  return '';
+}
+
+function countRespuesta(rows, applies, read) {
+  var si = 0;
+  var no = 0;
+  var vacio = 0;
+  for (var i = 0; i < rows.length; i++) {
+    if (!applies(rows[i])) continue;
+    var answer = read(rows[i]);
+    if (answer === 'si') si++;
+    else if (answer === 'no') no++;
+    else vacio++;
+  }
+  return { si: si, no: no, vacio: vacio };
+}
+
+function respuestaItem(label, counts) {
+  return { label: label, si: counts.si, no: counts.no, vacio: counts.vacio };
+}
+
+function rotuloRespuestas(rows) {
+  return [
+    respuestaItem('Tiene rótulo', countRespuesta(rows, rotuloApplies, function (row) {
+      return ynCell(row[V.rotulo]);
+    })),
+    respuestaItem('Fecha', countRespuesta(rows, rotuloItemApplies, function (row) {
+      return ynCell(row[V.rotFecha]);
+    })),
+    respuestaItem('Enfermero', countRespuesta(rows, rotuloItemApplies, readEnfermeroRotulo)),
+    respuestaItem('Legajo', countRespuesta(rows, rotuloItemApplies, function (row) {
+      return ynCell(row[V.rotLegajo]);
+    })),
+    respuestaItem('Turno', countRespuesta(rows, rotuloItemApplies, function (row) {
+      return ynCell(row[V.rotTurno]);
+    })),
+    respuestaItem('ABB', countRespuesta(rows, rotuloItemApplies, function (row) {
+      return ynCell(row[V.rotAbb]);
+    })),
+    respuestaItem('Visibilidad', countRespuesta(rows, function (row) {
+      return isYes(row[V.accesoSi]);
+    }, readVisibilidad))
+  ];
 }
 
 function summarizeVias(rows) {
@@ -1329,7 +1407,8 @@ function summarizeVias(rows) {
       { label: 'MSI', count: ubicaciones.MSI },
       { label: 'MID', count: ubicaciones.MID },
       { label: 'MII', count: ubicaciones.MII }
-    ]
+    ],
+    respuestas: rotuloRespuestas(rows)
   };
 }
 

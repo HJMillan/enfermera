@@ -45,6 +45,12 @@ export const ACCESO_PERIFERICO_HEADERS = [
   'Sexo'                 // AO
 ];
 
+function ynOrBlank(val: boolean | undefined): '' | 'SI' | 'NO' {
+  if (val === true) return 'SI';
+  if (val === false) return 'NO';
+  return '';
+}
+
 export function mapAccesoPerifericoToRow(data: AccesoPerifericoForm): (string | number | boolean)[] {
   const tiene = Boolean(data.tieneAcceso);
   const esPercutaneo = !tiene && data.tipoAccesoAlternativo === 'percutaneo';
@@ -67,15 +73,15 @@ export function mapAccesoPerifericoToRow(data: AccesoPerifericoForm): (string | 
     tiene && data.ubicacionMSI ? 'SI' : '',                                         // N
     tiene && data.ubicacionMII ? 'SI' : '',                                         // O
     tiene && data.ubicacionMID ? 'SI' : '',                                         // P
-    evaluaRotulo ? (data.tieneRotulo ? 'SI' : 'NO') : '',                           // Q
-    evaluaRotulo && data.tieneRotulo ? (data.rotuloTieneFecha ? 'SI' : 'NO') : '',   // R
-    evaluaRotulo && data.tieneRotulo ? ((data.rotuloTieneEnfermero ?? data.rotuloTieneNombre) ? 'SI' : 'NO') : '',  // S (Nombre / Enfermero)
-    evaluaRotulo && data.tieneRotulo ? (data.rotuloTieneLegajo ? 'SI' : 'NO') : '',  // T
-    evaluaRotulo && data.tieneRotulo ? ((data.rotuloTieneEnfermero ?? data.rotuloTieneNombre) ? 'SI' : 'NO') : '', // U (Enfermero)
-    evaluaRotulo && data.tieneRotulo ? (data.rotuloTieneTurno ? 'SI' : 'NO') : '',   // V
-    evaluaRotulo && data.tieneRotulo ? (data.rotuloTieneABB ? 'SI' : 'NO') : '',     // W
-    tiene ? (data.visibilidad ? 'SI' : '') : '',                                    // X
-    tiene ? (!data.visibilidad ? 'NO' : '') : '',                                   // Y
+    evaluaRotulo ? ynOrBlank(data.tieneRotulo) : '',                                // Q
+    evaluaRotulo && data.tieneRotulo === true ? ynOrBlank(data.rotuloTieneFecha) : '', // R
+    evaluaRotulo && data.tieneRotulo === true ? ynOrBlank(data.rotuloTieneEnfermero ?? data.rotuloTieneNombre) : '', // S
+    evaluaRotulo && data.tieneRotulo === true ? ynOrBlank(data.rotuloTieneLegajo) : '', // T
+    evaluaRotulo && data.tieneRotulo === true ? ynOrBlank(data.rotuloTieneEnfermero ?? data.rotuloTieneNombre) : '', // U
+    evaluaRotulo && data.tieneRotulo === true ? ynOrBlank(data.rotuloTieneTurno) : '', // V
+    evaluaRotulo && data.tieneRotulo === true ? ynOrBlank(data.rotuloTieneABB) : '', // W
+    tiene && data.visibilidad === true ? 'SI' : '',                                 // X
+    tiene && data.visibilidad === false ? 'NO' : '',                                // Y
     tiene && data.fijacionTegaderm ? 'SI' : '',                                     // Z
     tiene && data.fijacionCinta ? 'SI' : '',                                        // AA
     tiene && data.fijacionCinta ? (data.fijacionCintaTipo || '') : '',              // AB

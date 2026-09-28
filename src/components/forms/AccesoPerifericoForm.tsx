@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { BasePatientData, AccesoPerifericoForm as AccesoFormType } from '../../types/form';
 import { validateSharedPatient } from '../../utils/patientValidation';
+import { formatPlace } from '../../config/sectorConfig';
 import { ToggleYesNo } from '../common/ToggleYesNo';
 import { TouchChip } from '../common/TouchChip';
 import { BedStatusSelector } from '../common/BedStatusSelector';
@@ -42,14 +43,14 @@ const INITIAL_ACCESO_STATE = {
   ubicacionMSI: false,
   ubicacionMII: false,
   ubicacionMID: false,
-  tieneRotulo: true,
-  rotuloTieneFecha: true,
-  rotuloTieneNombre: true,
-  rotuloTieneLegajo: true,
-  rotuloTieneEnfermero: true,
-  rotuloTieneTurno: true,
-  rotuloTieneABB: true,
-  visibilidad: true,
+  tieneRotulo: undefined as boolean | undefined,
+  rotuloTieneFecha: undefined as boolean | undefined,
+  rotuloTieneNombre: undefined as boolean | undefined,
+  rotuloTieneLegajo: undefined as boolean | undefined,
+  rotuloTieneEnfermero: undefined as boolean | undefined,
+  rotuloTieneTurno: undefined as boolean | undefined,
+  rotuloTieneABB: undefined as boolean | undefined,
+  visibilidad: undefined as boolean | undefined,
   fijacionTegaderm: true,
   fijacionCinta: false,
   fijacionCintaTipo: '' as CintaTipo,
@@ -141,7 +142,7 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
           <span className="font-bold text-slate-900 text-sm">{titulo}</span>
         </div>
 
-        {form.tieneRotulo && (
+        {form.tieneRotulo === true && (
           <button
             type="button"
             onClick={handleAllRotuloYes}
@@ -157,16 +158,16 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
       {/* Condicional Principal SI / NO */}
       <ToggleYesNo
         label="¿Tiene Rótulo?"
-        description="Indica si el acceso cuenta con el rótulo de identificación colocado"
-        value={Boolean(form.tieneRotulo)}
+        description="Si no marcás sí o no, queda vacío"
+        value={form.tieneRotulo}
         onChange={(val) => setForm((p) => ({ ...p, tieneRotulo: val }))}
+        onUnset={() => setForm((p) => ({ ...p, tieneRotulo: undefined }))}
       />
 
-      {/* Si tiene rótulo -> Mostrar opciones SI/NO */}
-      {form.tieneRotulo && (
+      {form.tieneRotulo === true && (
         <div className="pt-2 border-t border-slate-100 space-y-2.5 animate-fade-in">
           <span className="text-[11px] font-bold text-slate-600 uppercase block">
-            Datos identificados en el rótulo (SI/NO):
+            Datos del rótulo. Si no marcás uno, queda vacío.
           </span>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -177,7 +178,13 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
               { key: 'rotuloTieneTurno' as const, label: 'Turno' },
               { key: 'rotuloTieneABB' as const, label: 'ABB' },
             ].map((item) => {
-              const val = Boolean(form[item.key]);
+              const val = form[item.key];
+              const setItem = (next: boolean | undefined) =>
+                setForm((p) => ({
+                  ...p,
+                  [item.key]: next,
+                  ...(item.key === 'rotuloTieneEnfermero' ? { rotuloTieneNombre: next } : {}),
+                }));
               return (
                 <div
                   key={item.key}
@@ -187,15 +194,9 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
                   <div className="flex gap-1">
                     <button
                       type="button"
-                      onClick={() =>
-                        setForm((p) => ({
-                          ...p,
-                          [item.key]: true,
-                          ...(item.key === 'rotuloTieneEnfermero' ? { rotuloTieneNombre: true } : {}),
-                        }))
-                      }
+                      onClick={() => setItem(val === true ? undefined : true)}
                       className={`px-2 py-0.5 text-xs font-bold rounded-md border touch-active cursor-pointer ${
-                        val
+                        val === true
                           ? 'bg-sky-700 text-white border-sky-700'
                           : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
                       }`}
@@ -204,15 +205,9 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() =>
-                        setForm((p) => ({
-                          ...p,
-                          [item.key]: false,
-                          ...(item.key === 'rotuloTieneEnfermero' ? { rotuloTieneNombre: false } : {}),
-                        }))
-                      }
+                      onClick={() => setItem(val === false ? undefined : false)}
                       className={`px-2 py-0.5 text-xs font-bold rounded-md border touch-active cursor-pointer ${
-                        !val
+                        val === false
                           ? 'bg-slate-700 text-white border-slate-700'
                           : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
                       }`}
@@ -253,6 +248,7 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
         }
         cama={patient.cama}
         habitacion={patient.habitacion}
+        sector={patient.sector}
       />
 
       {/* SI SE SELECCIONA UN ESTADO DE CAMA, LO DE ABAJO SE BLOQUEA Y SOLO APARECE EL BOTÓN DE GUARDAR */}
@@ -260,7 +256,7 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
         <div className="space-y-3 animate-fade-in pt-1">
           <div className="p-4 rounded-[var(--radius-md)] bg-amber-50/95 border-2 border-amber-300 text-amber-950 space-y-2 text-center shadow-[var(--shadow-rest)] transition-[box-shadow] duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-hover)]">
             <h3 className="font-extrabold text-base md:text-lg">
-              Cama {patient.cama} — {form.motivoAusente === 'Libre' ? 'Cama Libre' : `Paciente en ${form.motivoAusente}`}
+              {formatPlace(patient.sector, patient.habitacion, patient.cama)} — {form.motivoAusente === 'Libre' ? 'Libre' : `Paciente en ${form.motivoAusente}`}
             </h3>
             <p className="text-xs text-amber-800 font-medium max-w-md mx-auto">
               Relevamiento de vías bloqueado para esta cama ya que el paciente no se encuentra en ella.
@@ -292,7 +288,7 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
           <div className="bg-white p-4 rounded-[var(--radius-md)] border border-slate-200/80 shadow-[var(--shadow-rest)] transition-[transform,box-shadow,border-color] duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-hover)]">
             <div className="flex items-center justify-between mb-1">
               <span className="text-[11px] font-bold uppercase tracking-wider text-sky-700 bg-sky-50 px-2 py-0.5 rounded-[var(--radius-sm)] border border-sky-100">
-                Cama {patient.cama} · Habitación {patient.habitacion}
+                {formatPlace(patient.sector, patient.habitacion, patient.cama)}
                 {patient.historiaClinica && ` · HC: ${patient.historiaClinica}`}
               </span>
               <span className="text-[11px] text-slate-500 font-mono hidden sm:inline">
@@ -490,9 +486,10 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
           <div className="bg-white p-4 rounded-[var(--radius-md)] border border-slate-200/80 shadow-[var(--shadow-rest)] transition-[transform,box-shadow,border-color] duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-hover)]">
             <ToggleYesNo
               label="Visibilidad del Sitio de Punción"
-              description="¿El punto de punción es visible e inspeccionable?"
+              description="Si no marcás sí o no, queda vacío"
               value={form.visibilidad}
               onChange={(val) => setForm((p) => ({ ...p, visibilidad: val }))}
+              onUnset={() => setForm((p) => ({ ...p, visibilidad: undefined }))}
             />
           </div>
 

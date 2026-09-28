@@ -25,8 +25,48 @@ import {
 } from 'lucide-react';
 import type { StoredRecord, AccesoPerifericoForm, SondaVesicalForm, UppForm } from '../../types/form';
 import { formatIsoDateDisplay } from '../../utils/dateUtils';
+import { formatPlace } from '../../config/sectorConfig';
 import { retryRecordSync } from '../../services/webhookService';
 import { exportRecordsToCSV, deleteRecordLocally, clearStoredRecords } from '../../services/storageService';
+
+function ynState(val: boolean | undefined): 'si' | 'no' | 'vacio' {
+  if (val === true) return 'si';
+  if (val === false) return 'no';
+  return 'vacio';
+}
+
+function ynBadgeClass(val: boolean | undefined): string {
+  if (val === true) return 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+  if (val === false) return 'bg-rose-100 text-rose-800 border border-rose-200';
+  return 'bg-slate-100 text-slate-700 border border-slate-200';
+}
+
+function ynBadgeText(val: boolean | undefined, yes: string, no: string): string {
+  if (val === true) return yes;
+  if (val === false) return no;
+  return 'Vacío';
+}
+
+function RotuloItemMark({ label, state }: { label: string; state: 'si' | 'no' | 'vacio' }) {
+  const tone =
+    state === 'si'
+      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+      : state === 'no'
+        ? 'bg-rose-50 text-rose-800 border-rose-200'
+        : 'bg-slate-100 text-slate-600 border-slate-200';
+  return (
+    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center justify-between border ${tone}`}>
+      <span>{label}</span>
+      {state === 'si' ? (
+        <Check className="w-3 h-3 text-emerald-600" />
+      ) : state === 'no' ? (
+        <X className="w-3 h-3 text-rose-600" />
+      ) : (
+        <span className="text-slate-500">—</span>
+      )}
+    </span>
+  );
+}
 
 const getBradenRiskBadge = (score: number) => {
   if (score <= 12) {
@@ -232,32 +272,33 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                 ].filter(Boolean) as string[]
               : [];
 
-            const rotuloAuditoria = dataAcceso?.tieneRotulo
-              ? [
-                  { label: 'Fecha', ok: Boolean(dataAcceso.rotuloTieneFecha) },
-                  {
-                    label: 'Enfermero',
-                    ok: Boolean(dataAcceso.rotuloTieneEnfermero ?? dataAcceso.rotuloTieneNombre),
-                  },
-                  { label: 'Legajo', ok: Boolean(dataAcceso.rotuloTieneLegajo) },
-                  { label: 'Turno', ok: Boolean(dataAcceso.rotuloTieneTurno) },
-                  { label: 'ABB', ok: Boolean(dataAcceso.rotuloTieneABB) },
-                ]
-              : [];
+            const rotuloAuditoria =
+              dataAcceso?.tieneRotulo === true
+                ? [
+                    { label: 'Fecha', state: ynState(dataAcceso.rotuloTieneFecha) },
+                    {
+                      label: 'Enfermero',
+                      state: ynState(dataAcceso.rotuloTieneEnfermero ?? dataAcceso.rotuloTieneNombre),
+                    },
+                    { label: 'Legajo', state: ynState(dataAcceso.rotuloTieneLegajo) },
+                    { label: 'Turno', state: ynState(dataAcceso.rotuloTieneTurno) },
+                    { label: 'ABB', state: ynState(dataAcceso.rotuloTieneABB) },
+                  ]
+                : [];
 
             const percutaneoRotuloAuditoria =
               !dataAcceso?.tieneAcceso &&
               dataAcceso?.tipoAccesoAlternativo === 'percutaneo' &&
-              dataAcceso?.tieneRotulo
+              dataAcceso?.tieneRotulo === true
                 ? [
-                    { label: 'Fecha', ok: Boolean(dataAcceso.rotuloTieneFecha) },
+                    { label: 'Fecha', state: ynState(dataAcceso.rotuloTieneFecha) },
                     {
                       label: 'Enfermero',
-                      ok: Boolean(dataAcceso.rotuloTieneEnfermero ?? dataAcceso.rotuloTieneNombre),
+                      state: ynState(dataAcceso.rotuloTieneEnfermero ?? dataAcceso.rotuloTieneNombre),
                     },
-                    { label: 'Legajo', ok: Boolean(dataAcceso.rotuloTieneLegajo) },
-                    { label: 'Turno', ok: Boolean(dataAcceso.rotuloTieneTurno) },
-                    { label: 'ABB', ok: Boolean(dataAcceso.rotuloTieneABB) },
+                    { label: 'Legajo', state: ynState(dataAcceso.rotuloTieneLegajo) },
+                    { label: 'Turno', state: ynState(dataAcceso.rotuloTieneTurno) },
+                    { label: 'ABB', state: ynState(dataAcceso.rotuloTieneABB) },
                   ]
                 : [];
 
@@ -307,7 +348,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-extrabold text-slate-900 text-sm">
-                          Sec {item.data.sector} · Hab {item.data.habitacion} · Cama {item.data.cama}
+                          Sec {item.data.sector} · {formatPlace(item.data.sector, item.data.habitacion, item.data.cama)}
                         </span>
                         {item.data.historiaClinica && (
                           <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
@@ -399,7 +440,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (window.confirm(`¿Eliminar registro de Sec ${item.data.sector} Hab ${item.data.habitacion} Cama ${item.data.cama}?`)) {
+                        if (window.confirm(`¿Eliminar registro de Sec ${item.data.sector} · ${formatPlace(item.data.sector, item.data.habitacion, item.data.cama)}?`)) {
                           deleteRecordLocally(item.id);
                           onRefresh();
                         }
@@ -437,7 +478,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                           </span>
                         </div>
                         <div className="text-[11px] text-slate-600">
-                          Hab. {item.data.habitacion} · Cama {item.data.cama}{' '}
+                          {formatPlace(item.data.sector, item.data.habitacion, item.data.cama)}{' '}
                           {item.data.historiaClinica && `· HC: ${item.data.historiaClinica}`}
                         </div>
                       </div>
@@ -494,34 +535,16 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                               <div className="flex items-center justify-between mb-1.5">
                                 <span className="text-[11px] font-bold text-slate-600">Rótulo:</span>
                                 <span
-                                  className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${
-                                    dataAcceso.tieneRotulo
-                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                      : 'bg-rose-100 text-rose-800 border border-rose-200'
-                                  }`}
+                                  className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${ynBadgeClass(dataAcceso.tieneRotulo)}`}
                                 >
-                                  {dataAcceso.tieneRotulo ? 'SÍ (Colocado)' : 'NO (Sin rótulo)'}
+                                  {ynBadgeText(dataAcceso.tieneRotulo, 'SÍ (Colocado)', 'NO (Sin rótulo)')}
                                 </span>
                               </div>
 
-                              {dataAcceso.tieneRotulo && (
+                              {dataAcceso.tieneRotulo === true && (
                                 <div className="grid grid-cols-3 gap-1 pt-1">
                                   {rotuloAuditoria.map((it) => (
-                                    <span
-                                      key={it.label}
-                                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center justify-between border ${
-                                        it.ok
-                                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                          : 'bg-slate-100 text-slate-600 border-slate-200'
-                                      }`}
-                                    >
-                                      <span>{it.label}</span>
-                                      {it.ok ? (
-                                        <Check className="w-3 h-3 text-emerald-600" />
-                                      ) : (
-                                        <X className="w-3 h-3 text-slate-600" />
-                                      )}
-                                    </span>
+                                    <RotuloItemMark key={it.label} label={it.label} state={it.state} />
                                   ))}
                                 </div>
                               )}
@@ -537,21 +560,25 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                               </span>
                               <span
                                 className={`text-[10px] font-extrabold px-2 py-0.5 rounded flex items-center gap-1 border ${
-                                  dataAcceso.visibilidad
+                                  dataAcceso.visibilidad === true
                                     ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                    : 'bg-amber-50 text-amber-800 border-amber-200'
+                                    : dataAcceso.visibilidad === false
+                                      ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                      : 'bg-slate-100 text-slate-700 border-slate-200'
                                 }`}
                               >
-                                {dataAcceso.visibilidad ? (
+                                {dataAcceso.visibilidad === true ? (
                                   <>
                                     <Check className="w-3 h-3 text-emerald-600" />
                                     <span>Punto visible</span>
                                   </>
-                                ) : (
+                                ) : dataAcceso.visibilidad === false ? (
                                   <>
                                     <AlertCircle className="w-3 h-3 text-amber-600" />
                                     <span>No visible</span>
                                   </>
+                                ) : (
+                                  <span>Vacío</span>
                                 )}
                               </span>
                             </div>
@@ -732,34 +759,16 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onRefresh }) 
                                 Tipo: Catéter Percutáneo
                               </span>
                               <span
-                                className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${
-                                  dataAcceso.tieneRotulo
-                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                    : 'bg-rose-100 text-rose-800 border border-rose-200'
-                                }`}
+                                className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${ynBadgeClass(dataAcceso.tieneRotulo)}`}
                               >
-                                Rótulo: {dataAcceso.tieneRotulo ? 'SÍ (Colocado)' : 'NO'}
+                                Rótulo: {ynBadgeText(dataAcceso.tieneRotulo, 'SÍ (Colocado)', 'NO')}
                               </span>
                             </div>
 
-                            {dataAcceso.tieneRotulo && (
+                            {dataAcceso.tieneRotulo === true && (
                               <div className="grid grid-cols-3 gap-1 pt-1 border-t border-slate-100">
                                 {percutaneoRotuloAuditoria.map((it) => (
-                                  <span
-                                    key={it.label}
-                                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center justify-between border ${
-                                      it.ok
-                                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                        : 'bg-slate-100 text-slate-600 border-slate-200'
-                                    }`}
-                                  >
-                                    <span>{it.label}</span>
-                                    {it.ok ? (
-                                      <Check className="w-3 h-3 text-emerald-600" />
-                                    ) : (
-                                      <X className="w-3 h-3 text-slate-600" />
-                                    )}
-                                  </span>
+                                  <RotuloItemMark key={it.label} label={it.label} state={it.state} />
                                 ))}
                               </div>
                             )}

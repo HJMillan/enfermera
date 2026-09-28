@@ -15,6 +15,7 @@ import { ToggleYesNo } from '../common/ToggleYesNo';
 import { TouchChip } from '../common/TouchChip';
 import { BedStatusSelector } from '../common/BedStatusSelector';
 import { validateSharedPatient } from '../../utils/patientValidation';
+import { formatPlace } from '../../config/sectorConfig';
 
 interface UppFormProps {
   patient: BasePatientData;
@@ -193,6 +194,7 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
         }
         cama={patient.cama}
         habitacion={patient.habitacion}
+        sector={patient.sector}
       />
 
       {/* SI SE SELECCIONA UN ESTADO DE CAMA, LO DE ABAJO SE BLOQUEA Y SOLO APARECE EL BOTÓN DE GUARDAR */}
@@ -200,7 +202,7 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
         <div className="space-y-3 animate-fade-in pt-1">
           <div className="p-4 rounded-[var(--radius-md)] bg-amber-50/95 border-2 border-amber-300 text-amber-950 space-y-2 text-center shadow-[var(--shadow-rest)] transition-[box-shadow] duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-hover)]">
             <h3 className="font-extrabold text-base md:text-lg">
-              Cama {patient.cama} — {form.motivoAusente === 'Libre' ? 'Cama Libre' : `Paciente en ${form.motivoAusente}`}
+              {formatPlace(patient.sector, patient.habitacion, patient.cama)} — {form.motivoAusente === 'Libre' ? 'Libre' : `Paciente en ${form.motivoAusente}`}
             </h3>
             <p className="text-xs text-amber-800 font-medium max-w-md mx-auto">
               Relevamiento de LPP bloqueado para esta cama ya que el paciente no se encuentra en ella.
@@ -232,7 +234,7 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
           <div className="bg-white p-4 rounded-[var(--radius-md)] border border-slate-200/80 shadow-[var(--shadow-rest)] transition-[transform,box-shadow,border-color] duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-hover)]">
             <div className="flex items-center justify-between mb-1">
               <span className="text-[11px] font-bold uppercase tracking-wider text-rose-700 bg-rose-50 px-2 py-0.5 rounded-[var(--radius-sm)] border border-rose-100">
-                Cama {patient.cama} · Habitación {patient.habitacion}
+                {formatPlace(patient.sector, patient.habitacion, patient.cama)}
                 {patient.historiaClinica && ` · HC: ${patient.historiaClinica}`}
               </span>
               <span className="text-[11px] text-slate-500 font-mono hidden sm:inline">

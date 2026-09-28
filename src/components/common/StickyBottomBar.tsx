@@ -1,12 +1,14 @@
 import React from 'react';
 import { Save, CheckCircle, RefreshCw } from 'lucide-react';
+import { formatPlace } from '../../config/sectorConfig';
+import type { SectorType } from '../../types/form';
 
 interface StickyBottomBarProps {
   formId: string;
   isSubmitting: boolean;
   cama: string;
   habitacion: string;
-  sector: string;
+  sector: SectorType;
   hasCondition: boolean;
   roundType: 'ACCESO_PERIFERICO' | 'UPP' | 'SONDA_VESICAL';
   altType?: string;
@@ -64,10 +66,10 @@ export const StickyBottomBar: React.FC<StickyBottomBarProps> = ({
         {/* Contexto compacto a la izquierda (visible en tablet/desktop o pequeño en móvil) */}
         <div className="hidden xs:flex flex-col min-w-0 pr-1">
           <span className="text-[10px] uppercase font-bold text-slate-500 leading-tight">
-            Sec {sector} · Hab {habitacion}
+            Sec {sector}
           </span>
           <span className="text-xs font-black text-slate-800 truncate">
-            Cama {cama}
+            {formatPlace(sector, habitacion, cama)}
           </span>
         </div>
 

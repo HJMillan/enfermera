@@ -20,10 +20,13 @@ import {
   SECTORS,
   COMMON_BEDS,
   isValidRoom,
-  getDefaultRoom,
   getNextValidRoom,
-  getValidRooms,
   SECTOR_CONFIG,
+  PLACE_SECTORS,
+  isPlaceSector,
+  coercePlace,
+  placeGroupTitle,
+  sectorPlaceCount,
 } from '../../config/sectorConfig';
 import { getStaffBySector, saveStaffBySector } from '../../services/storageService';
 import { useWakeLock } from '../../hooks/useWakeLock';
@@ -65,13 +68,12 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
 
   const handleSectorChange = (sec: SectorType) => {
     const staff = getStaffBySector(sec);
-    const roomValid = isValidRoom(sec, patient.habitacion);
-    const nextRoom = roomValid ? patient.habitacion : getDefaultRoom(sec);
+    const place = coercePlace(sec, patient.habitacion, patient.cama);
 
     onChange({
       sector: sec,
-      habitacion: nextRoom,
-      cama: roomValid ? patient.cama : '1',
+      habitacion: place.habitacion,
+      cama: place.cama,
       cantidadEnfermeras: staff.enfermeras,
       cantidadAuxiliares: staff.auxiliares,
     });
@@ -107,8 +109,9 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
   const cantAuxiliares = patient.cantidadAuxiliares ?? getStaffBySector(patient.sector).auxiliares;
 
   // Camas censadas en este sector en el turno de hoy
-  const validRoomsSector = useMemo(() => getValidRooms(patient.sector), [patient.sector]);
-  const totalBedsSector = validRoomsSector.length * 4;
+  const placeLayout = PLACE_SECTORS[patient.sector];
+  const placeBased = isPlaceSector(patient.sector);
+  const totalBedsSector = sectorPlaceCount(patient.sector);
 
   const censadasSector = useMemo(() => {
     const set = new Set<string>();
@@ -123,7 +126,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
   return (
     <div className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-[var(--shadow-rest)] sticky z-20 px-2.5 py-2 md:px-4 md:py-3 transition-[box-shadow,border-color] duration-[var(--duration-base)] ease-[var(--ease-standard)]" style={{ top: 'var(--header-height)' }}>
       {/* Barra superior: Ronda activa, reloj, Wake Lock y avance */}
-      <div className="flex items-center justify-between gap-1.5 mb-1.5">
+      <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
         <div className="flex items-center gap-1.5 flex-wrap min-w-0">
           <div
             className={`flex items-center gap-1 text-xs font-bold px-2 py-0.5 md:py-1 rounded-[var(--radius-sm)] border shrink-0 ${
@@ -150,7 +153,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
               onChange={(e) =>
                 onChange({ fechaHora: composeFechaHora(e.target.value, fechaParts.time) })
               }
-              className="bg-transparent font-semibold text-[11px] text-slate-700 outline-none w-[7.4rem]"
+              className="bg-transparent font-semibold text-slate-700 outline-none w-[7.6rem]"
             />
             <input
               type="time"
@@ -159,7 +162,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
               onChange={(e) =>
                 onChange({ fechaHora: composeFechaHora(fechaParts.date, e.target.value) })
               }
-              className="bg-transparent font-semibold text-[11px] text-slate-700 outline-none w-[4.2rem]"
+              className="bg-transparent font-semibold text-slate-700 outline-none w-[6.4rem]"
             />
           </div>
 
@@ -197,7 +200,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0 ml-auto">
           {/* Hint de atajos en Chromebook / PC */}
           <div
             className="hidden lg:flex items-center gap-1 text-[11px] text-slate-600 font-mono bg-slate-50 px-2 py-1 rounded-[var(--radius-sm)] border border-slate-200"
@@ -212,46 +215,49 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
             type="button"
             onClick={onNextBed}
             className="flex items-center gap-1 bg-linear-to-r from-sky-600 to-cyan-600 text-white text-xs md:text-sm font-bold px-2.5 py-1 md:py-1.5 rounded-[var(--radius-sm)] shadow-[var(--shadow-rest)] hover:shadow-[var(--shadow-hover)] hover:-translate-y-0.5 active:scale-[0.98] transition-[transform,box-shadow,filter] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] cursor-pointer shrink-0"
-            title="Mantener sector y habitación, e incrementar la cama"
+            title={
+              placeBased
+                ? 'Pasar al siguiente lugar del sector'
+                : 'Mantener sector y habitación, e incrementar la cama'
+            }
           >
             <Bed className="w-3.5 h-3.5" />
-            <span>+1 Cama</span>
+            <span>{patient.sector === 'RCA' ? 'Siguiente' : '+1 Cama'}</span>
           </button>
         </div>
       </div>
 
       {/* Selector de Sector en Chips Rápidos y Botón de Mapa de Camas */}
-      <div className="flex items-center justify-between gap-1 mb-1.5 overflow-x-auto pb-0.5 scrollbar-none">
-        <div className="flex items-center gap-1 shrink-0">
-          <span className="text-xs font-bold text-slate-600 flex items-center gap-0.5 mr-0.5 shrink-0">
-            <Building2 className="w-3.5 h-3.5 text-slate-600" />
-            Sector:
-          </span>
-          {SECTORS.map((sec) => (
-            <button
-              key={sec}
-              type="button"
-              onClick={() => handleSectorChange(sec)}
-              className={`min-w-9 md:min-w-10 h-8 md:h-9 px-2 md:px-2.5 rounded-[var(--radius-sm)] font-bold text-xs md:text-sm border transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer shrink-0 ${
-                patient.sector === sec
-                  ? 'bg-sky-700 text-white border-sky-700 shadow-[var(--shadow-rest)] ring-2 ring-sky-200 hover:scale-[1.015]'
-                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
-              }`}
-            >
-              {sec}
-            </button>
-          ))}
-        </div>
+      <div className="flex flex-wrap items-center gap-1 mb-1.5">
+        <span className="text-xs font-bold text-slate-600 flex items-center gap-0.5 mr-0.5 shrink-0">
+          <Building2 className="w-3.5 h-3.5 text-slate-600" />
+          Sector:
+        </span>
+        {SECTORS.map((sec) => (
+          <button
+            key={sec}
+            type="button"
+            onClick={() => handleSectorChange(sec)}
+            className={`min-w-9 md:min-w-10 h-8 md:h-9 px-2 md:px-2.5 rounded-[var(--radius-sm)] font-bold text-xs md:text-sm border transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer shrink-0 ${
+              patient.sector === sec
+                ? 'bg-sky-700 text-white border-sky-700 shadow-[var(--shadow-rest)] ring-2 ring-sky-200 hover:scale-[1.015]'
+                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+            }`}
+          >
+            {sec}
+          </button>
+        ))}
 
-        {/* Botón Mapa de Camas del Sector */}
         <button
           type="button"
           onClick={() => setIsMatrixOpen(true)}
-          className="flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-[var(--radius-sm)] bg-sky-50 text-sky-900 border border-sky-200 hover:bg-sky-100 shadow-[var(--shadow-rest)] hover:shadow-[var(--shadow-hover)] hover:-translate-y-0.5 active:scale-[0.98] transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] cursor-pointer shrink-0"
+          className="ml-auto flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-[var(--radius-sm)] bg-sky-50 text-sky-900 border border-sky-200 hover:bg-sky-100 shadow-[var(--shadow-rest)] hover:shadow-[var(--shadow-hover)] hover:-translate-y-0.5 active:scale-[0.98] transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] cursor-pointer shrink-0"
           title="Ver mapa de camas del sector (cuáles faltan censar)"
         >
           <MapPin className="w-3.5 h-3.5 text-sky-700" />
-          <span>{censadasSector}/{totalBedsSector} camas</span>
+          <span>
+            {censadasSector}/{totalBedsSector} {patient.sector === 'RCA' ? 'lugares' : 'camas'}
+          </span>
         </button>
       </div>
 
@@ -317,9 +323,44 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
         </div>
       </div>
 
-      {/* Habitación, Cama e Historia Clínica (HC) - Grid Adaptativo Inteligente */}
+      {/* Habitación, lugar e Historia Clínica (HC) */}
       <div className="grid grid-cols-12 gap-1.5 md:gap-2">
+        {placeBased && placeLayout && (
+          <div className="col-span-12 space-y-1">
+            {placeLayout.groups.map((group) => (
+              <div
+                key={group.habitacion}
+                className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-[var(--radius-sm)] px-2 py-1"
+              >
+                <span className="text-[11px] md:text-xs uppercase font-bold text-slate-600 shrink-0 min-w-[4.75rem]">
+                  {placeGroupTitle(group.noun)}
+                </span>
+                <div className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto pb-0.5">
+                  {Array.from({ length: group.count }, (_, i) => String(i + 1)).map((num) => {
+                    const selected = patient.habitacion === group.habitacion && patient.cama === num;
+                    return (
+                      <button
+                        key={`${group.habitacion}-${num}`}
+                        type="button"
+                        onClick={() => onChange({ habitacion: group.habitacion, cama: num })}
+                        className={`shrink-0 w-9 h-9 rounded-[var(--radius-sm)] font-bold text-xs border transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer ${
+                          selected
+                            ? 'bg-sky-700 text-white border-sky-700 shadow-[var(--shadow-rest)] ring-2 ring-sky-200'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {num}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Habitación con incremento y rango de sector */}
+        {!placeBased && (
         <div
           className={`col-span-6 sm:col-span-4 flex items-center justify-between bg-slate-50 border rounded-xl px-2 py-1 focus-within:border-sky-500 focus-within:bg-white focus-within:ring-1 focus-within:ring-sky-100 ${
             isRoomValid ? 'border-slate-200' : 'border-rose-300 bg-rose-50/50'
@@ -370,9 +411,10 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
             </button>
           </div>
         </div>
+        )}
 
         {/* Historia Clínica (HC) */}
-        <div className="col-span-6 sm:col-span-3 flex items-center bg-slate-50 border border-slate-200 rounded-[var(--radius-sm)] px-2 py-1 focus-within:border-sky-500 focus-within:bg-white focus-within:ring-1 focus-within:ring-sky-100">
+        <div className={`${placeBased ? 'col-span-12' : 'col-span-6 sm:col-span-3'} flex items-center bg-slate-50 border border-slate-200 rounded-[var(--radius-sm)] px-2 py-1 focus-within:border-sky-500 focus-within:bg-white focus-within:ring-1 focus-within:ring-sky-100`}>
           <FileText className="w-3.5 h-3.5 text-slate-500 mr-1.5 shrink-0" />
           <div className="flex flex-col flex-1 min-w-0">
             <span className="text-[11px] md:text-xs uppercase font-bold text-slate-600 leading-tight">
@@ -389,6 +431,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
         </div>
 
         {/* Camas: Selector de 1 toque (Chips 1, 2, 3, 4 - Máximo 4) */}
+        {!placeBased && (
         <div className="col-span-12 sm:col-span-5 flex items-center justify-between bg-slate-50 border border-slate-200 rounded-[var(--radius-sm)] px-2 py-1">
           <div className="flex items-center gap-1.5 flex-1 overflow-x-auto">
             <Bed className="w-3.5 h-3.5 text-slate-600 shrink-0" />
@@ -412,6 +455,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
           </div>
 
         </div>
+        )}
       </div>
 
       <div className="grid grid-cols-12 gap-1.5 md:gap-2 mt-1.5">

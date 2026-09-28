@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { X, CheckCircle2, Bed, MapPin } from 'lucide-react';
 import type { SectorType, FormType, StoredRecord } from '../../types/form';
-import { getValidRooms, COMMON_BEDS } from '../../config/sectorConfig';
+import { getValidRooms, COMMON_BEDS, isPlaceSector, PLACE_SECTORS, placeGroupTitle, sectorPlaceCount } from '../../config/sectorConfig';
 
 interface SectorBedMatrixModalProps {
   isOpen: boolean;
@@ -25,6 +25,8 @@ export const SectorBedMatrixModal: React.FC<SectorBedMatrixModalProps> = ({
   onSelectBed,
 }) => {
   const validRooms = useMemo(() => getValidRooms(sector), [sector]);
+  const placeBased = isPlaceSector(sector);
+  const placeLayout = PLACE_SECTORS[sector];
 
   // Mapa de camas censadas en el sector para la ronda activa
   const censadasSet = useMemo(() => {
@@ -39,7 +41,8 @@ export const SectorBedMatrixModal: React.FC<SectorBedMatrixModalProps> = ({
 
   if (!isOpen) return null;
 
-  const totalBeds = validRooms.length * 4;
+  const totalBeds = placeBased ? sectorPlaceCount(sector) : validRooms.length * 4;
+  const placeWord = sector === 'RCA' ? 'lugares' : 'camas';
   const censadasCount = censadasSet.size;
   const progressPercent = totalBeds > 0 ? Math.round((censadasCount / totalBeds) * 100) : 0;
 
@@ -65,7 +68,7 @@ export const SectorBedMatrixModal: React.FC<SectorBedMatrixModalProps> = ({
             </div>
             <div>
               <h2 className="font-black text-base md:text-lg leading-tight">
-                Mapa de Camas · Sector {sector}
+                Mapa de {sector === 'RCA' ? 'lugares' : 'camas'} · Sector {sector}
               </h2>
               <p className="text-xs text-white/80">
                 {isVias ? 'Ronda 1: Vías Periféricas' : isSondas ? 'Ronda 3: Sondas vesicales' : 'Ronda 2: LPP'}
@@ -88,7 +91,7 @@ export const SectorBedMatrixModal: React.FC<SectorBedMatrixModalProps> = ({
           <div className="flex items-center justify-between font-bold text-slate-700">
             <span>Progreso del Sector</span>
             <span className="font-mono text-sky-800 font-extrabold">
-              {censadasCount} de {totalBeds} camas ({progressPercent}%)
+              {censadasCount} de {totalBeds} {placeWord} ({progressPercent}%)
             </span>
           </div>
 
@@ -114,14 +117,65 @@ export const SectorBedMatrixModal: React.FC<SectorBedMatrixModalProps> = ({
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-3.5 h-3.5 rounded bg-sky-600 border border-sky-600" />
-              <span className="font-bold text-sky-900">Cama actual</span>
+              <span className="font-bold text-sky-900">{sector === 'RCA' ? 'Lugar actual' : 'Cama actual'}</span>
             </div>
           </div>
         </div>
 
         {/* Grilla de Habitaciones y Camas */}
         <div className="p-3.5 overflow-y-auto flex-1 space-y-2.5">
-          {validRooms.length === 0 ? (
+          {placeBased && placeLayout ? (
+            <div className="space-y-3">
+              {placeLayout.groups.map((group) => (
+                <div
+                  key={group.habitacion}
+                  className="p-3 rounded-[var(--radius-md)] border border-slate-200 bg-white shadow-[var(--shadow-rest)]"
+                >
+                  <span className="font-extrabold text-xs text-slate-800 block mb-2">
+                    {placeGroupTitle(group.noun)}
+                  </span>
+                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
+                    {Array.from({ length: group.count }, (_, i) => String(i + 1)).map((bed) => {
+                      const isCensada = censadasSet.has(`${group.habitacion}-${bed}`);
+                      const isSelected = currentRoom === group.habitacion && currentBed === bed;
+                      const placeName =
+                        group.habitacion === sector ? `${group.noun} ${bed}` : `${group.habitacion} ${bed}`;
+                      return (
+                        <button
+                          key={bed}
+                          type="button"
+                          onClick={() => {
+                            onSelectBed(group.habitacion, bed);
+                            onClose();
+                          }}
+                          className={`min-h-[44px] rounded-[var(--radius-sm)] font-bold text-xs flex flex-col items-center justify-center transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] cursor-pointer border ${
+                            isSelected
+                              ? 'bg-sky-600 text-white border-sky-600 shadow-[var(--shadow-rest)] ring-2 ring-sky-300'
+                              : isCensada
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 hover:shadow-[var(--shadow-rest)]'
+                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-white hover:shadow-[var(--shadow-rest)]'
+                          }`}
+                          title={`${placeName} (${isCensada ? 'Censada' : 'Pendiente'})`}
+                        >
+                          <span className="flex items-center gap-0.5">
+                            <Bed className="w-3 h-3" />
+                            <span>{bed}</span>
+                          </span>
+                          <span className="text-[9px] font-semibold leading-tight">
+                            {isCensada ? (
+                              <CheckCircle2 className="w-2.5 h-2.5 inline text-emerald-600" />
+                            ) : (
+                              'Pend'
+                            )}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : validRooms.length === 0 ? (
             <p className="text-center text-sm text-slate-500 py-6">
               No hay habitaciones configuradas para este sector.
             </p>

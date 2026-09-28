@@ -46,6 +46,14 @@ export interface StatsAlerta {
   hc?: string;
 }
 
+export interface StatsYn {
+  label: string;
+  si: number;
+  no: number;
+  /** Pregunta que correspondía y la celda quedó vacía. */
+  vacio: number;
+}
+
 export interface StatsViasBlock {
   evaluadas: number;
   conPeriferico: number;
@@ -56,6 +64,7 @@ export interface StatsViasBlock {
   rotuloSi: number;
   rotuloCompleto: number;
   rotuloIncompleto: number;
+  respuestas?: StatsYn[];
   infiltracion: number;
   eritema: number;
   sinRetorno: number;
