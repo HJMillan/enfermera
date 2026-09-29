@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { ErrorBoundary } from './components/common/ErrorBoundary.tsx'
+// Se importa temprano para no perder el evento beforeinstallprompt.
+import './utils/installPrompt'
+import { registerServiceWorker } from './utils/serviceWorker'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -12,20 +15,4 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 )
 
-// Service Worker solo en el host publicado. En localhost Vite queda tapado por la caché PWA.
-if ('serviceWorker' in navigator) {
-  const host = window.location.hostname;
-  const isLocalDev = host === 'localhost' || host === '127.0.0.1';
-  if (!isLocalDev) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker
-        .register('/sw.js')
-        .then((reg) => {
-          console.log('Service Worker registrado con éxito:', reg.scope);
-        })
-        .catch((err) => {
-          console.warn('Error al registrar Service Worker:', err);
-        });
-    });
-  }
-}
+registerServiceWorker()

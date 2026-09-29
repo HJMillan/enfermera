@@ -1,5 +1,14 @@
 # Plan de implementación
 
+> **Estado (29/09/2026): fases 0 a 9 implementadas** en la app v1.3.0 y el Code.gs v1.3.0. Verificado con `tsc`, ESLint, 30 pruebas (Vitest, incluida una simulación de Google Sheets para Code.gs), `vite build` y una prueba en navegador de los flujos principales. Falta desplegar: ver las secciones "Google Apps Script" y "Publicar una versión" del README.
+>
+> Diferencias con lo planeado:
+> - 1.2: no hay período con `REQUIRE_TOKEN = false`. El token es obligatorio en cuanto se crea la propiedad `API_TOKEN`; sin ella el script acepta todo, como antes.
+> - 2.2: el reporte de cierre y "Deshacer" se piden por JSONP (GET) para poder leer la respuesta real del script.
+> - 3.3: en lugar de un script aparte, el menú del Sheet tiene **📅 Normalizar fechas a texto**.
+> - 3.5: Sondas guarda el estado de cama en una columna nueva, `Estado Cama`.
+> - 8: `scripts/seed-demo-stats.mjs` se borró; la simulación de Code.gs cubre ese caso sin escribir en el Sheet real.
+
 Cubre todos los hallazgos del análisis del 29/09/2026. Está ordenado por riesgo: primero lo que puede perder o corromper datos, al final la calidad del código y la documentación.
 
 Convenciones:

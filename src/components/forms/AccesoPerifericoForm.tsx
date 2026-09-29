@@ -12,7 +12,9 @@ import {
   Split,
 } from 'lucide-react';
 import type { BasePatientData, AccesoPerifericoForm as AccesoFormType } from '../../types/form';
-import { validateSharedPatient } from '../../utils/patientValidation';
+import { validateAccesoForm, validatePlace, validateSharedPatient } from '../../utils/patientValidation';
+import { shouldIgnoreShortcut } from '../../utils/keyboard';
+import { ROTULO_ITEMS } from '../../config/clinical';
 import { formatPlace } from '../../config/sectorConfig';
 import { ToggleYesNo } from '../common/ToggleYesNo';
 import { TouchChip } from '../common/TouchChip';
@@ -23,13 +25,6 @@ interface AccesoPerifericoFormProps {
   onSubmit: (formData: AccesoFormType) => Promise<void>;
   onSwitchToUpp?: () => void;
 }
-
-type FijacionKey =
-  | 'fijacionTegaderm'
-  | 'fijacionCinta'
-  | 'fijacionHipafix'
-  | 'fijacionVenda'
-  | 'fijacionContencionMecanica';
 
 type CintaTipo = 'hipoalergénica' | 'tela' | 'seda' | 'coban' | 'papel' | 'transparente' | '';
 
@@ -79,10 +74,7 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
   // Atajos de teclado en Chromebook cuando no se está dentro de un input
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const activeTag = document.activeElement?.tagName.toLowerCase();
-      if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
-        return;
-      }
+      if (shouldIgnoreShortcut(e)) return;
 
       if (e.key === 'n' || e.key === 'N') {
         e.preventDefault();
@@ -112,12 +104,14 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.motivoAusente) {
-      const sharedError = validateSharedPatient(patient);
-      if (sharedError) {
-        setError(sharedError);
-        return;
-      }
+    const validationError =
+      validatePlace(patient) ||
+      // En Vías, sexo y fecha de ingreso son opcionales
+      (form.motivoAusente ? null : validateSharedPatient(patient, { requireSexoYIngreso: false })) ||
+      validateAccesoForm(form);
+    if (validationError) {
+      setError(validationError);
+      return;
     }
     setError(null);
     setIsSubmitting(true);
@@ -171,20 +165,9 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
           </span>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {[
-              { key: 'rotuloTieneFecha' as const, label: 'Fecha' },
-              { key: 'rotuloTieneEnfermero' as const, label: 'Enfermero' },
-              { key: 'rotuloTieneLegajo' as const, label: 'Legajo' },
-              { key: 'rotuloTieneTurno' as const, label: 'Turno' },
-              { key: 'rotuloTieneABB' as const, label: 'ABB' },
-            ].map((item) => {
+            {ROTULO_ITEMS.map((item) => {
               const val = form[item.key];
-              const setItem = (next: boolean | undefined) =>
-                setForm((p) => ({
-                  ...p,
-                  [item.key]: next,
-                  ...(item.key === 'rotuloTieneEnfermero' ? { rotuloTieneNombre: next } : {}),
-                }));
+              const setItem = (next: boolean | undefined) => setForm((p) => ({ ...p, [item.key]: next }));
               return (
                 <div
                   key={item.key}
@@ -195,6 +178,8 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
                     <button
                       type="button"
                       onClick={() => setItem(val === true ? undefined : true)}
+                      aria-pressed={val === true}
+                      aria-label={`${item.label}: sí`}
                       className={`px-2 py-0.5 text-xs font-bold rounded-md border touch-active cursor-pointer ${
                         val === true
                           ? 'bg-sky-700 text-white border-sky-700'
@@ -206,6 +191,8 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
                     <button
                       type="button"
                       onClick={() => setItem(val === false ? undefined : false)}
+                      aria-pressed={val === false}
+                      aria-label={`${item.label}: no`}
                       className={`px-2 py-0.5 text-xs font-bold rounded-md border touch-active cursor-pointer ${
                         val === false
                           ? 'bg-slate-700 text-white border-slate-700'
@@ -231,7 +218,7 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
       className="px-3 pb-12 md:px-4 space-y-3.5 max-w-2xl mx-auto"
     >
       {error && (
-        <p className="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-[var(--radius-sm)] px-3 py-2">
+        <p role="alert" className="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-[var(--radius-sm)] px-3 py-2">
           {error}
         </p>
       )}
@@ -506,41 +493,18 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
                   { key: 'fijacionHipafix' as const, label: 'Hipafix' },
                   { key: 'fijacionVenda' as const, label: 'Venda' },
                   { key: 'fijacionContencionMecanica' as const, label: 'Contención Mecánica' },
-                  { key: 'fijacionCintaTransparente' as const, label: 'Cinta transparente' },
                 ].map((item) => (
                   <TouchChip
                     key={item.key}
                     label={item.label}
-                    selected={
-                      item.key === 'fijacionCinta'
-                        ? Boolean(form.fijacionCinta) && form.fijacionCintaTipo !== 'transparente'
-                        : item.key === 'fijacionCintaTransparente'
-                          ? form.fijacionCintaTipo === 'transparente'
-                          : Boolean(form[item.key as FijacionKey])
-                    }
+                    selected={Boolean(form[item.key])}
                     onClick={() =>
-                      setForm((p) => {
-                        if (item.key === 'fijacionCinta') {
-                          const already = Boolean(p.fijacionCinta) && p.fijacionCintaTipo !== 'transparente';
-                          return {
-                            ...p,
-                            fijacionCinta: already ? false : true,
-                            fijacionCintaTipo: already ? '' : '',
-                          };
-                        }
-                        if (item.key === 'fijacionCintaTransparente') {
-                          const already = p.fijacionCintaTipo === 'transparente';
-                          return {
-                            ...p,
-                            fijacionCinta: already ? false : true,
-                            fijacionCintaTipo: already ? '' : 'transparente',
-                          };
-                        }
-                        return {
-                          ...p,
-                          [item.key]: !p[item.key as FijacionKey],
-                        };
-                      })
+                      setForm((p) => ({
+                        ...p,
+                        [item.key]: !p[item.key],
+                        // Al quitar la cinta se borra también su tipo
+                        ...(item.key === 'fijacionCinta' && p.fijacionCinta ? { fijacionCintaTipo: '' as CintaTipo } : {}),
+                      }))
                     }
                   />
                 ))}
@@ -548,7 +512,7 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
             </div>
 
             {/* Sub-tipos de Cinta (Aparecen si Cinta está seleccionada) */}
-            {form.fijacionCinta && form.fijacionCintaTipo !== 'transparente' && (
+            {form.fijacionCinta && (
               <div className="p-3 bg-sky-50/60 border border-sky-100 rounded-xl space-y-1.5 animate-fade-in">
                 <span className="block text-xs font-bold text-sky-900">
                   Tipo de Cinta seleccionada:
@@ -567,6 +531,7 @@ export const AccesoPerifericoForm: React.FC<AccesoPerifericoFormProps> = ({
                     <button
                       key={cTipo.id}
                       type="button"
+                      aria-pressed={form.fijacionCintaTipo === cTipo.id}
                       onClick={() => setForm((p) => ({ ...p, fijacionCintaTipo: cTipo.id }))}
                       className={`px-2.5 py-1.5 rounded-[var(--radius-sm)] text-xs font-bold border transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer ${
                         form.fijacionCintaTipo === cTipo.id

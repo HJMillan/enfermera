@@ -4,7 +4,8 @@ import type { BasePatientData, SondaVesicalForm as SondaFormType, UbicacionSonda
 import { ToggleYesNo } from '../common/ToggleYesNo';
 import { TouchChip } from '../common/TouchChip';
 import { BedStatusSelector } from '../common/BedStatusSelector';
-import { validateSharedPatient, validateSondaForm } from '../../utils/patientValidation';
+import { validatePlace, validateSharedPatient, validateSondaForm } from '../../utils/patientValidation';
+import { shouldIgnoreShortcut } from '../../utils/keyboard';
 import { formatPlace } from '../../config/sectorConfig';
 
 interface SondaVesicalFormProps {
@@ -37,10 +38,7 @@ export const SondaVesicalForm: React.FC<SondaVesicalFormProps> = ({ patient, onS
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const activeTag = document.activeElement?.tagName.toLowerCase();
-      if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
-        return;
-      }
+      if (shouldIgnoreShortcut(e)) return;
 
       if (e.key === 'n' || e.key === 'N') {
         e.preventDefault();
@@ -82,16 +80,12 @@ export const SondaVesicalForm: React.FC<SondaVesicalFormProps> = ({ patient, onS
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.motivoAusente) {
-      const sharedError = validateSharedPatient(patient);
-      if (sharedError) {
-        setError(sharedError);
-        return;
-      }
-    }
-    const sondaError = validateSondaForm(form);
-    if (sondaError) {
-      setError(sondaError);
+    const validationError =
+      validatePlace(patient) ||
+      (form.motivoAusente ? null : validateSharedPatient(patient)) ||
+      validateSondaForm(form);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
@@ -115,6 +109,11 @@ export const SondaVesicalForm: React.FC<SondaVesicalFormProps> = ({ patient, onS
       onSubmit={handleSubmit}
       className="px-3 pb-12 md:px-4 space-y-3.5 max-w-2xl mx-auto"
     >
+      {error && (
+        <p role="alert" className="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-[var(--radius-sm)] px-3 py-2">
+          {error}
+        </p>
+      )}
       <BedStatusSelector
         value={form.motivoAusente || ''}
         onChange={(status) =>
@@ -145,11 +144,6 @@ export const SondaVesicalForm: React.FC<SondaVesicalFormProps> = ({ patient, onS
             </p>
           </div>
 
-          {error && (
-            <p className="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-[var(--radius-sm)] px-3 py-2">
-              {error}
-            </p>
-          )}
 
           <button
             type="submit"
@@ -189,11 +183,6 @@ export const SondaVesicalForm: React.FC<SondaVesicalFormProps> = ({ patient, onS
 
           {form.tieneSonda === 'NO' && (
             <div className="pt-2 animate-fade-in space-y-3">
-              {error && (
-                <p className="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-[var(--radius-sm)] px-3 py-2">
-                  {error}
-                </p>
-              )}
               <button
                 type="submit"
                 disabled={isSubmitting}
@@ -305,11 +294,6 @@ export const SondaVesicalForm: React.FC<SondaVesicalFormProps> = ({ patient, onS
                 />
               </div>
 
-              {error && (
-                <p className="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-[var(--radius-sm)] px-3 py-2">
-                  {error}
-                </p>
-              )}
 
               <button
                 type="submit"

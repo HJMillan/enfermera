@@ -38,6 +38,7 @@ export const TouchChip: React.FC<TouchChipProps> = ({
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={selected}
       className={`group min-h-[48px] px-2 py-1.5 sm:px-3.5 sm:py-2 rounded-[var(--radius-sm)] border font-medium text-xs sm:text-sm transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 flex items-center justify-center gap-1.5 cursor-pointer select-none w-full text-center ${getSelectedStyles()}`}
     >
       {icon && (

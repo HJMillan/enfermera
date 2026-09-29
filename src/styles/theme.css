@@ -18,44 +18,30 @@
   --radius-sm: 12px;   /* chips, botones */
   --radius-md: 20px;   /* cards secundarias */
   --radius-lg: 28px;   /* cards hero / secciones destacadas */
-}
 
-/* Utilidades Apple consistentes para Tailwind v4 */
-@utility apple-card {
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-rest);
-  transition-property: transform, box-shadow, border-color, background-color;
-  transition-duration: var(--duration-base);
-  transition-timing-function: var(--ease-standard);
-}
+  /* Celulares grandes: textos secundarios que no entran en pantallas chicas */
+  --breakpoint-xs: 30rem;
 
-@utility apple-card-interactive {
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-rest);
-  transition-property: transform, box-shadow, border-color, background-color;
-  transition-duration: var(--duration-base);
-  transition-timing-function: var(--ease-standard);
-  cursor: pointer;
+  /* Aparición de secciones y modales (clase animate-fade-in) */
+  --animate-fade-in: fade-in 250ms var(--ease-standard) both;
 
-  &:hover {
-    box-shadow: var(--shadow-hover);
-    transform: translateY(-2px) scale(1.015);
-  }
-
-  &:active {
-    transform: scale(0.98);
-    transition-duration: var(--duration-fast);
-    transition-timing-function: var(--ease-snappy);
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
   }
 }
 
-@utility apple-press {
-  transition-property: transform, filter, box-shadow;
-  transition-duration: var(--duration-fast);
-  transition-timing-function: var(--ease-snappy);
-
-  &:active {
-    transform: scale(0.98);
-    filter: brightness(0.96);
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
   }
 }

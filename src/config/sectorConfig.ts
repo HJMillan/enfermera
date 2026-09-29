@@ -61,7 +61,6 @@ export const SECTORS: SectorType[] = [
   'RCA',
 ];
 
-export const MAX_BEDS = 4;
 export const COMMON_BEDS = ['1', '2', '3', '4'];
 
 export interface SectorPlace {
@@ -161,6 +160,33 @@ export function stepBed(
   const start = idx === -1 ? 0 : idx;
   const next = Math.min(COMMON_BEDS.length - 1, Math.max(0, start + delta));
   return { habitacion, cama: COMMON_BEDS[next] };
+}
+
+/**
+ * Siguiente lugar a relevar después de guardar (o con "+1 Cama").
+ * En internación, después de la última cama pasa a la cama 1 de la siguiente habitación válida.
+ * `sectorEnd` indica que ya era el último lugar del sector y no se movió.
+ */
+export function advancePlace(
+  sector: SectorType,
+  habitacion: string,
+  cama: string
+): { habitacion: string; cama: string; sectorEnd: boolean } {
+  if (isPlaceSector(sector)) {
+    const next = stepBed(sector, habitacion, cama, 1);
+    const sectorEnd = next.habitacion === habitacion && next.cama === cama;
+    return { ...next, sectorEnd };
+  }
+
+  const idx = COMMON_BEDS.indexOf(cama);
+  if (idx !== -1 && idx < COMMON_BEDS.length - 1) {
+    return { habitacion, cama: COMMON_BEDS[idx + 1], sectorEnd: false };
+  }
+  const nextRoom = getNextValidRoom(sector, habitacion, 1);
+  if (nextRoom === habitacion) {
+    return { habitacion, cama, sectorEnd: true };
+  }
+  return { habitacion: nextRoom, cama: COMMON_BEDS[0], sectorEnd: false };
 }
 
 export function formatPlace(sector: SectorType, habitacion: string, cama: string): string {

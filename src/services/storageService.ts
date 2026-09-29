@@ -1,20 +1,56 @@
 import type { StoredRecord, SectorType, SexoPaciente } from '../types/form';
-import { ACCESO_PERIFERICO_HEADERS, UPP_HEADERS, SONDA_HEADERS } from './sheetMapper';
+import { HEADERS_BY_FORM } from './sheetMapper';
+import { localDateISO } from '../utils/dateUtils';
 
 const STORAGE_KEYS = {
   WEBHOOK_URL: 'pe_webhook_url',
+  WEBHOOK_TOKEN: 'pe_webhook_token',
   LAST_SECTOR: 'pe_last_sector',
   LAST_ROOM: 'pe_last_room',
   LAST_BED: 'pe_last_bed',
   RECORDS_HISTORY: 'pe_records_history_v1',
-  NOTIFICATION_EMAILS: 'pe_notification_emails',
   LAST_HC: 'pe_last_hc',
   LAST_SEXO: 'pe_last_sexo',
   LAST_FECHA_INGRESO: 'pe_last_fecha_ingreso',
   STAFF_BY_SECTOR: 'pe_staff_by_sector_v1',
 };
 
-export const DEFAULT_NOTIFICATION_EMAILS = ['jesusmillan86@gmail.com', 'pamelaestua91@gmail.com'];
+/** Claves de versiones anteriores que ya no se usan. */
+const LEGACY_KEYS = ['pe_notification_emails'];
+
+/** Registros enviados que se conservan en el dispositivo. Los no enviados no se descartan nunca. */
+const MAX_SYNCED_RECORDS = 200;
+
+// Acceso seguro a localStorage: en modo privado o con la cuota llena puede lanzar.
+function readKey(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeKey(key: string, value: string): boolean {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (err) {
+    console.error(`No se pudo guardar ${key} en el dispositivo:`, err);
+    return false;
+  }
+}
+
+function removeKey(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // sin almacenamiento disponible
+  }
+}
+
+export function cleanupLegacyStorage(): void {
+  LEGACY_KEYS.forEach(removeKey);
+}
 
 export interface SectorStaff {
   enfermeras: number;
@@ -23,7 +59,7 @@ export interface SectorStaff {
 
 export function getStaffBySector(sector: SectorType): SectorStaff {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.STAFF_BY_SECTOR);
+    const raw = readKey(STORAGE_KEYS.STAFF_BY_SECTOR);
     if (!raw) return { enfermeras: 0, auxiliares: 0 };
     const parsed = JSON.parse(raw);
     return parsed[sector] || { enfermeras: 0, auxiliares: 0 };
@@ -34,37 +70,33 @@ export function getStaffBySector(sector: SectorType): SectorStaff {
 
 export function saveStaffBySector(sector: SectorType, staff: SectorStaff): void {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.STAFF_BY_SECTOR);
+    const raw = readKey(STORAGE_KEYS.STAFF_BY_SECTOR);
     const parsed = raw ? JSON.parse(raw) : {};
     parsed[sector] = staff;
-    localStorage.setItem(STORAGE_KEYS.STAFF_BY_SECTOR, JSON.stringify(parsed));
+    writeKey(STORAGE_KEYS.STAFF_BY_SECTOR, JSON.stringify(parsed));
   } catch (err) {
     console.error('Error al guardar staff por sector:', err);
   }
 }
 
-export function getNotificationEmails(): string[] {
-  const stored = localStorage.getItem(STORAGE_KEYS.NOTIFICATION_EMAILS);
-  if (!stored) return DEFAULT_NOTIFICATION_EMAILS;
-  try {
-    const parsed = JSON.parse(stored);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_NOTIFICATION_EMAILS;
-  } catch {
-    return DEFAULT_NOTIFICATION_EMAILS;
-  }
-}
-
-export function setNotificationEmails(emails: string[]): void {
-  localStorage.setItem(STORAGE_KEYS.NOTIFICATION_EMAILS, JSON.stringify(emails));
-}
-
-// Webhook URL
+// Webhook: si el usuario lo configuró (aunque lo haya dejado vacío) manda lo guardado;
+// si nunca lo tocó, se usa VITE_WEBHOOK_URL (útil en desarrollo).
 export function getStoredWebhookUrl(): string {
-  return localStorage.getItem(STORAGE_KEYS.WEBHOOK_URL) || import.meta.env.VITE_WEBHOOK_URL || '';
+  const stored = readKey(STORAGE_KEYS.WEBHOOK_URL);
+  if (stored !== null) return stored.trim();
+  return (import.meta.env.VITE_WEBHOOK_URL || '').trim();
 }
 
 export function setStoredWebhookUrl(url: string): void {
-  localStorage.setItem(STORAGE_KEYS.WEBHOOK_URL, url.trim());
+  writeKey(STORAGE_KEYS.WEBHOOK_URL, url.trim());
+}
+
+export function getStoredWebhookToken(): string {
+  return (readKey(STORAGE_KEYS.WEBHOOK_TOKEN) || '').trim();
+}
+
+export function setStoredWebhookToken(token: string): void {
+  writeKey(STORAGE_KEYS.WEBHOOK_TOKEN, token.trim());
 }
 
 // Patient Context defaults
@@ -78,30 +110,30 @@ export interface PatientContextMemory {
 }
 
 export function getPatientContextMemory(): PatientContextMemory {
-  const sexoRaw = localStorage.getItem(STORAGE_KEYS.LAST_SEXO);
+  const sexoRaw = readKey(STORAGE_KEYS.LAST_SEXO);
   return {
-    sector: (localStorage.getItem(STORAGE_KEYS.LAST_SECTOR) as SectorType) || 'PB',
-    habitacion: localStorage.getItem(STORAGE_KEYS.LAST_ROOM) || '1',
-    cama: localStorage.getItem(STORAGE_KEYS.LAST_BED) || '1',
-    historiaClinica: localStorage.getItem(STORAGE_KEYS.LAST_HC) || '',
+    sector: (readKey(STORAGE_KEYS.LAST_SECTOR) as SectorType) || 'PB',
+    habitacion: readKey(STORAGE_KEYS.LAST_ROOM) || '1',
+    cama: readKey(STORAGE_KEYS.LAST_BED) || '1',
+    historiaClinica: readKey(STORAGE_KEYS.LAST_HC) || '',
     sexo: sexoRaw === 'M' || sexoRaw === 'F' ? sexoRaw : '',
-    fechaIngreso: localStorage.getItem(STORAGE_KEYS.LAST_FECHA_INGRESO) || '',
+    fechaIngreso: readKey(STORAGE_KEYS.LAST_FECHA_INGRESO) || '',
   };
 }
 
 export function savePatientContextMemory(data: PatientContextMemory): void {
-  localStorage.setItem(STORAGE_KEYS.LAST_SECTOR, data.sector);
-  localStorage.setItem(STORAGE_KEYS.LAST_ROOM, data.habitacion);
-  localStorage.setItem(STORAGE_KEYS.LAST_BED, data.cama);
-  localStorage.setItem(STORAGE_KEYS.LAST_HC, data.historiaClinica || '');
-  localStorage.setItem(STORAGE_KEYS.LAST_SEXO, data.sexo || '');
-  localStorage.setItem(STORAGE_KEYS.LAST_FECHA_INGRESO, data.fechaIngreso || '');
+  writeKey(STORAGE_KEYS.LAST_SECTOR, data.sector);
+  writeKey(STORAGE_KEYS.LAST_ROOM, data.habitacion);
+  writeKey(STORAGE_KEYS.LAST_BED, data.cama);
+  writeKey(STORAGE_KEYS.LAST_HC, data.historiaClinica || '');
+  writeKey(STORAGE_KEYS.LAST_SEXO, data.sexo || '');
+  writeKey(STORAGE_KEYS.LAST_FECHA_INGRESO, data.fechaIngreso || '');
 }
 
 // Records History & Queue
 export function getStoredRecords(): StoredRecord[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.RECORDS_HISTORY);
+    const raw = readKey(STORAGE_KEYS.RECORDS_HISTORY);
     return raw ? JSON.parse(raw) : [];
   } catch (err) {
     console.error('Error al leer historial local:', err);
@@ -109,33 +141,65 @@ export function getStoredRecords(): StoredRecord[] {
   }
 }
 
-export function saveRecordLocally(record: StoredRecord): void {
+export function isRecordSynced(record: StoredRecord): boolean {
+  return record.syncStatus === 'SYNCED';
+}
+
+/** Recorta solo registros ya confirmados en el Sheet; los pendientes se conservan siempre. */
+function trimRecords(records: StoredRecord[]): StoredRecord[] {
+  let synced = 0;
+  return records.filter((r) => {
+    if (!isRecordSynced(r)) return true;
+    synced += 1;
+    return synced <= MAX_SYNCED_RECORDS;
+  });
+}
+
+function writeRecords(records: StoredRecord[]): boolean {
+  return writeKey(STORAGE_KEYS.RECORDS_HISTORY, JSON.stringify(records));
+}
+
+/** Devuelve false si el dispositivo no pudo guardar (almacenamiento lleno o bloqueado). */
+export function saveRecordLocally(record: StoredRecord): boolean {
   const current = getStoredRecords();
   const updated = [record, ...current.filter((r) => r.id !== record.id)];
-  // Conservar hasta 200 registros en local
-  localStorage.setItem(STORAGE_KEYS.RECORDS_HISTORY, JSON.stringify(updated.slice(0, 200)));
+  return writeRecords(trimRecords(updated));
 }
 
 export function deleteRecordLocally(id: string): void {
-  const current = getStoredRecords();
-  const updated = current.filter((r) => r.id !== id);
-  localStorage.setItem(STORAGE_KEYS.RECORDS_HISTORY, JSON.stringify(updated));
+  writeRecords(getStoredRecords().filter((r) => r.id !== id));
 }
 
 export function updateRecordStatus(id: string, status: StoredRecord['syncStatus'], errorMsg?: string): void {
-  const current = getStoredRecords();
-  const updated = current.map((item) => {
-    if (item.id === id) {
-      return { ...item, syncStatus: status, errorMessage: errorMsg };
-    }
-    return item;
-  });
-  localStorage.setItem(STORAGE_KEYS.RECORDS_HISTORY, JSON.stringify(updated));
+  const updated = getStoredRecords().map((item) =>
+    item.id === id ? { ...item, syncStatus: status, errorMessage: errorMsg } : item
+  );
+  writeRecords(updated);
 }
 
 export function clearStoredRecords(): void {
-  localStorage.removeItem(STORAGE_KEYS.RECORDS_HISTORY);
+  removeKey(STORAGE_KEYS.RECORDS_HISTORY);
 }
+
+/** Borra solo los registros confirmados en el Sheet. Devuelve cuántos quedaron sin enviar. */
+export function clearSyncedRecords(): number {
+  const remaining = getStoredRecords().filter((r) => !isRecordSynced(r));
+  writeRecords(remaining);
+  return remaining.length;
+}
+
+function csvCell(val: unknown): string {
+  let str = String(val ?? '');
+  // Evita que Excel interprete el texto como fórmula
+  if (/^[=+@]/.test(str) || /^-[^\d]/.test(str)) str = `'${str}`;
+  return `"${str.replace(/"/g, '""')}"`;
+}
+
+const CSV_SECTIONS = [
+  { formType: 'ACCESO_PERIFERICO' as const, title: '--- ACCESO PERIFÉRICO ---' },
+  { formType: 'UPP' as const, title: '--- LESIONES POR PRESIÓN (LPP) ---' },
+  { formType: 'SONDA_VESICAL' as const, title: '--- SONDAS VESICALES ---' },
+];
 
 // Exportar historial a CSV
 export function exportRecordsToCSV(): void {
@@ -145,43 +209,24 @@ export function exportRecordsToCSV(): void {
     return;
   }
 
-  const accesoRecords = records.filter((r) => r.formType === 'ACCESO_PERIFERICO');
-  const uppRecords = records.filter((r) => r.formType === 'UPP');
-  const sondaRecords = records.filter((r) => r.formType === 'SONDA_VESICAL');
-
-  let csvContent = 'data:text/csv;charset=utf-8,';
-
-  if (accesoRecords.length > 0) {
-    csvContent += '--- ACCESO PERIFÉRICO ---\r\n';
-    csvContent += ACCESO_PERIFERICO_HEADERS.join(',') + '\r\n';
-    accesoRecords.forEach((r) => {
-      csvContent += r.rowValues.map((val) => `"${String(val).replace(/"/g, '""')}"`).join(',') + '\r\n';
-    });
-    csvContent += '\r\n';
+  const lines: string[] = [];
+  for (const section of CSV_SECTIONS) {
+    const rows = records.filter((r) => r.formType === section.formType);
+    if (rows.length === 0) continue;
+    lines.push(section.title);
+    lines.push(HEADERS_BY_FORM[section.formType].map(csvCell).join(','));
+    rows.forEach((r) => lines.push(r.rowValues.map(csvCell).join(',')));
+    lines.push('');
   }
 
-  if (uppRecords.length > 0) {
-    csvContent += '--- LESIONES POR PRESIÓN (LPP) ---\r\n';
-    csvContent += UPP_HEADERS.join(',') + '\r\n';
-    uppRecords.forEach((r) => {
-      csvContent += r.rowValues.map((val) => `"${String(val).replace(/"/g, '""')}"`).join(',') + '\r\n';
-    });
-    csvContent += '\r\n';
-  }
-
-  if (sondaRecords.length > 0) {
-    csvContent += '--- SONDAS VESICALES ---\r\n';
-    csvContent += SONDA_HEADERS.join(',') + '\r\n';
-    sondaRecords.forEach((r) => {
-      csvContent += r.rowValues.map((val) => `"${String(val).replace(/"/g, '""')}"`).join(',') + '\r\n';
-    });
-  }
-
-  const encodedUri = encodeURI(csvContent);
+  // BOM para que Excel lea bien los acentos; Blob en vez de data URI para no cortar en '#'.
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.setAttribute('href', encodedUri);
-  link.setAttribute('download', `planilla_enfermera_${new Date().toISOString().slice(0, 10)}.csv`);
+  link.href = url;
+  link.download = `planilla_enfermera_${localDateISO()}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }

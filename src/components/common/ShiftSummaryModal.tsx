@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { X, CheckCircle2, Download, Award, AlertCircle, Mail, Send, RefreshCw, Trash2, Sun } from 'lucide-react';
 import type { StoredRecord, AccesoPerifericoForm, SondaVesicalForm, UppForm } from '../../types/form';
-import { exportRecordsToCSV, getNotificationEmails, clearStoredRecords } from '../../services/storageService';
+import { exportRecordsToCSV, clearSyncedRecords, isRecordSynced } from '../../services/storageService';
 import { requestShiftSummaryEmail } from '../../services/webhookService';
 import { haptics } from '../../utils/haptics';
+import { latestPerBed } from '../../utils/records';
+import { SHIFT_LABEL } from '../../config/shift';
+import { ModalShell } from './ModalShell';
 
 interface ShiftSummaryModalProps {
   isOpen: boolean;
@@ -26,11 +29,10 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
 
   if (!isOpen) return null;
 
-  const emails = getNotificationEmails();
-
-  const viasRecords = records.filter((r) => r.formType === 'ACCESO_PERIFERICO');
-  const uppRecords = records.filter((r) => r.formType === 'UPP');
-  const sondaRecords = records.filter((r) => r.formType === 'SONDA_VESICAL');
+  // Una cama cargada dos veces cuenta una sola vez (vale el último registro).
+  const viasRecords = latestPerBed(records, 'ACCESO_PERIFERICO');
+  const uppRecords = latestPerBed(records, 'UPP');
+  const sondaRecords = latestPerBed(records, 'SONDA_VESICAL');
   const sondasCon = sondaRecords.filter((r) => (r.data as SondaVesicalForm).tieneSonda === 'SI').length;
 
   const viasConAcceso = viasRecords.filter(
@@ -43,7 +45,7 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
   ).length;
   const uppPielIntegra = uppRecords.length - uppConLesion;
 
-  const pendientesSync = records.filter((r) => r.syncStatus !== 'SYNCED').length;
+  const pendientesSync = records.filter((r) => !isRecordSynced(r)).length;
 
   const handleSendEmailReport = async () => {
     setIsSending(true);
@@ -74,20 +76,20 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-950/60 backdrop-blur-md transition-opacity duration-[var(--duration-base)] ease-[var(--ease-smooth)]">
-      <div className="bg-white w-full max-w-lg rounded-[var(--radius-lg)] shadow-[var(--shadow-elevated)] border border-slate-200/80 overflow-hidden flex flex-col max-h-[90vh] transition-[transform,box-shadow] duration-[var(--duration-base)] ease-[var(--ease-standard)]">
+    <ModalShell labelledBy="shift-title" onClose={onClose}>
         {/* Cabecera */}
         <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-gradient-to-r from-sky-700 to-cyan-700 text-white">
           <div className="flex items-center gap-2">
             <Award className="w-6 h-6 text-sky-200" />
             <div>
-              <h2 className="font-extrabold text-base md:text-lg leading-tight">Cierre de Turno (8:00 a 16:00 hs)</h2>
+              <h2 id="shift-title" className="font-extrabold text-base md:text-lg leading-tight">Cierre de Turno ({SHIFT_LABEL})</h2>
               <p className="text-xs text-sky-100">Resumen consolidado y despacho de reporte</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
+            aria-label="Cerrar resumen de turno"
             className="p-1.5 rounded-[var(--radius-sm)] text-white/80 hover:text-white hover:bg-white/10 transition-[transform,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer"
           >
             <X className="w-5 h-5" />
@@ -100,7 +102,7 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
             <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-[var(--radius-md)] shadow-[var(--shadow-rest)] transition-[transform,box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-hover)] hover:-translate-y-0.5">
               <span className="text-2xl font-black text-slate-900 block">{records.length}</span>
-              <span className="text-[11px] font-bold text-slate-600 uppercase">Total Registros</span>
+              <span className="text-[11px] font-bold text-slate-600 uppercase">Registros guardados</span>
             </div>
 
             <div className="bg-sky-50/80 border border-sky-100 p-3 rounded-[var(--radius-md)] shadow-[var(--shadow-rest)] transition-[transform,box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-hover)] hover:-translate-y-0.5">
@@ -188,22 +190,12 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
               <span>Despacho de Informe por Correo Electrónico</span>
             </div>
             <p className="text-xs text-sky-800">
-              Al hacer clic en el botón de abajo, se enviará automáticamente el resumen ejecutivo del turno con las estadísticas clave a los correos registrados.
+              Primero se envían al Sheet los registros pendientes del dispositivo y después se manda el resumen del turno a los destinatarios configurados en la planilla.
             </p>
-
-            <div className="bg-white/80 p-2 rounded-[var(--radius-sm)] border border-sky-100 text-xs text-slate-700 space-y-1">
-              <span className="font-semibold text-sky-900 block">Destinatarios configurados:</span>
-              <div className="flex flex-wrap gap-1">
-                {emails.map((m) => (
-                  <span key={m} className="bg-sky-100 text-sky-800 font-mono text-[10px] px-2 py-0.5 rounded-[var(--radius-sm)]">
-                    {m}
-                  </span>
-                ))}
-              </div>
-            </div>
 
             {sendStatus.type !== 'idle' && (
               <div
+                role="status"
                 className={`p-2.5 rounded-[var(--radius-sm)] text-xs flex items-center gap-2 ${
                   sendStatus.type === 'success'
                     ? 'bg-emerald-100 border border-emerald-300 text-emerald-900'
@@ -226,19 +218,24 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
                   <span>Jornada finalizada · Planilla lista para el próximo día</span>
                 </div>
                 <p className="text-emerald-800 text-[11px]">
-                  El reporte diario se despachó a Google Sheets y a las casillas de correo. Puedes descargar el CSV de respaldo y reiniciar la planilla para comenzar limpio mañana.
+                  Podés descargar el CSV de respaldo y limpiar el dispositivo para mañana. Solo se borran los registros confirmados en el Sheet; los pendientes se conservan.
                 </p>
                 <div className="pt-1">
                   <button
                     type="button"
                     onClick={() => {
+                      const aviso = pendientesSync > 0
+                        ? `
+
+${pendientesSync} registros todavía no están confirmados en el Sheet: se conservan en el dispositivo.`
+                        : '';
                       if (
                         window.confirm(
-                          '¿Deseas descargar el archivo CSV de respaldo y limpiar los registros de este turno para comenzar la ronda de mañana?'
+                          `¿Descargar el CSV de respaldo y limpiar los registros ya enviados para comenzar mañana?${aviso}`
                         )
                       ) {
                         exportRecordsToCSV();
-                        clearStoredRecords();
+                        clearSyncedRecords();
                         onShiftReset?.();
                         onClose();
                       }
@@ -261,7 +258,7 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
               {isSending ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Despachando reporte a Google Sheets y Correos...</span>
+                  <span>Sincronizando y enviando el reporte...</span>
                 </>
               ) : (
                 <>
@@ -308,7 +305,6 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
             Cerrar
           </button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 };

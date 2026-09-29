@@ -39,6 +39,7 @@ export interface AccesoPerifericoForm extends BasePatientData {
   // Rótulo de colocación (SI/NO condicional)
   tieneRotulo?: boolean;
   rotuloTieneFecha?: boolean;
+  /** Nombre del paciente en el rótulo (independiente de Enfermero). */
   rotuloTieneNombre?: boolean;
   rotuloTieneLegajo?: boolean;
   rotuloTieneEnfermero?: boolean;
@@ -139,7 +140,14 @@ export interface SondaVesicalForm extends BasePatientData {
 
 export type FormType = 'ACCESO_PERIFERICO' | 'UPP' | 'SONDA_VESICAL';
 
-export type SyncStatus = 'PENDING' | 'SYNCED' | 'FAILED';
+/**
+ * LOCAL: guardado sin webhook configurado; se envía cuando se configure.
+ * PENDING: todavía no se mandó (o se está mandando).
+ * SENT: se mandó, falta confirmar que la fila está en el Sheet.
+ * SYNCED: el Sheet confirmó la fila.
+ * FAILED: falló el envío o no se pudo confirmar; se reintenta.
+ */
+export type SyncStatus = 'LOCAL' | 'PENDING' | 'SENT' | 'SYNCED' | 'FAILED';
 
 export interface StoredRecord {
   id: string;

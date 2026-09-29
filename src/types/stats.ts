@@ -79,6 +79,8 @@ export interface StatsSondasBlock {
   evaluadas: number;
   conSonda: number;
   sinSonda: number;
+  /** Camas libres o con el paciente ausente (quirófano, diálisis, etc.). */
+  noEvaluables?: number;
   lumenes2: number;
   lumenes3: number;
   fijacionSi: number;
@@ -121,6 +123,7 @@ export interface StatsPayload {
     sondasUnicas?: number;
     noEvaluablesVias: number;
     noEvaluablesUpp: number;
+    noEvaluablesSondas?: number;
     capacidad: number;
     porSector: StatsSectorRow[];
   };

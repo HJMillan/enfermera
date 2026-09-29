@@ -1,30 +1,84 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Settings, Wifi, ShieldCheck, HeartPulse, Award, Syringe, Bandage, Keyboard, ClipboardList, BarChart3, Droplets } from 'lucide-react';
-import type { BasePatientData, AccesoPerifericoForm as AccesoFormType, UppForm as UppFormType, SondaVesicalForm as SondaFormType, StoredRecord } from './types/form';
-import { formatCurrentDateTime } from './utils/dateUtils';
+import type { BasePatientData, FormType, StoredRecord } from './types/form';
+import type { AccesoPerifericoForm as AccesoFormType, UppForm as UppFormType, SondaVesicalForm as SondaFormType } from './types/form';
+import { formatCurrentDateTime, localDateISO } from './utils/dateUtils';
+import { recordDay } from './utils/records';
 import { haptics } from './utils/haptics';
+import { isModalOpen, shouldIgnoreShortcut } from './utils/keyboard';
 import {
   getPatientContextMemory,
   savePatientContextMemory,
   getStoredRecords,
   getStoredWebhookUrl,
   getStaffBySector,
-  deleteRecordLocally,
+  cleanupLegacyStorage,
+  isRecordSynced,
 } from './services/storageService';
-import { stepBed, formatPlace } from './config/sectorConfig';
+import { advancePlace, stepBed, formatPlace } from './config/sectorConfig';
 import { APP_VERSION } from './config/version';
+import { SHIFT_LABEL } from './config/shift';
 
-import { submitPatientRecord } from './services/webhookService';
+import { RECORDS_CHANGED_EVENT, submitPatientRecord, syncPendingRecords, undoRecord } from './services/webhookService';
 import { PatientHeader } from './components/common/PatientHeader';
 import { ModuleTabs, type ActiveTab } from './components/navigation/ModuleTabs';
 import { AccesoPerifericoForm } from './components/forms/AccesoPerifericoForm';
 import { UppForm } from './components/forms/UppForm';
 import { SondaVesicalForm } from './components/forms/SondaVesicalForm';
-import { HistoryView } from './components/forms/HistoryView';
-import { StatsView } from './components/forms/StatsView';
+import { HistoryView } from './components/history/HistoryView';
+import { StatsView } from './components/stats/StatsView';
 import { SettingsModal } from './components/common/SettingsModal';
 import { ShiftSummaryModal } from './components/common/ShiftSummaryModal';
 import { ToastNotification, type ToastData } from './components/common/ToastNotification';
+import { UpdateBanner } from './components/common/UpdateBanner';
+
+/** id del <form> de cada ronda, para el atajo Enter. */
+const FORM_IDS: Partial<Record<ActiveTab, string>> = {
+  ACCESO_PERIFERICO: 'acceso-periferico-form',
+  UPP: 'upp-form',
+  SONDA_VESICAL: 'sonda-vesical-form',
+};
+
+const TOAST_PREFIX: Record<FormType, string> = {
+  ACCESO_PERIFERICO: 'Vía',
+  UPP: 'LPP',
+  SONDA_VESICAL: 'Sonda',
+};
+
+function situacionTexto(formType: FormType, data: AccesoFormType | UppFormType | SondaFormType): string {
+  if (formType === 'ACCESO_PERIFERICO') {
+    const d = data as AccesoFormType;
+    if (d.tieneAcceso) return 'Con vía';
+    if (d.tipoAccesoAlternativo === 'acceso_central') return 'Acceso Central';
+    if (d.tipoAccesoAlternativo === 'percutaneo') return 'Percutáneo';
+    return d.motivoAusente || 'Sin vía';
+  }
+  if (formType === 'UPP') {
+    const d = data as UppFormType;
+    return d.tieneUpp ? 'Con LPP' : d.motivoAusente || 'Piel Íntegra';
+  }
+  const d = data as SondaFormType;
+  if (d.motivoAusente) return d.motivoAusente;
+  return d.tieneSonda === 'SI' ? `Con sonda Fr ${d.numeroSonda || '?'}` : 'Sin sonda';
+}
+
+const SIDEBAR_ITEMS: {
+  tab: ActiveTab;
+  title: string;
+  subtitle: string;
+  icon: typeof Syringe;
+  active: string;
+  iconBg: string;
+  countColor: string;
+}[] = [
+  { tab: 'ACCESO_PERIFERICO', title: 'Ronda 1: Vías Periféricas', subtitle: 'Inspección de catéteres y rótulos', icon: Syringe, active: 'bg-sky-50/90 border-sky-400 text-sky-950 ring-2 ring-sky-200', iconBg: 'bg-sky-600', countColor: 'text-sky-800' },
+  { tab: 'UPP', title: 'Ronda 2: LPP', subtitle: 'Piel, Braden y colchones', icon: Bandage, active: 'bg-rose-50/90 border-rose-400 text-rose-950 ring-2 ring-rose-200', iconBg: 'bg-rose-600', countColor: 'text-rose-800' },
+  { tab: 'SONDA_VESICAL', title: 'Ronda 3: Sondas vesicales', subtitle: 'Graduación, lúmenes y fijación', icon: Droplets, active: 'bg-teal-50/90 border-teal-400 text-teal-950 ring-2 ring-teal-200', iconBg: 'bg-teal-600', countColor: 'text-teal-800' },
+  { tab: 'STATS', title: 'Estadísticas', subtitle: 'Resumen de la ronda', icon: BarChart3, active: 'bg-indigo-50/90 border-indigo-400 text-indigo-950 ring-2 ring-indigo-200', iconBg: 'bg-indigo-600', countColor: 'text-indigo-800' },
+  { tab: 'HISTORY', title: 'Historial', subtitle: 'Registros del turno', icon: ClipboardList, active: 'bg-slate-100 border-slate-400 text-slate-950 ring-2 ring-slate-300', iconBg: 'bg-slate-600', countColor: 'text-slate-700' },
+];
+
+const KBD = 'bg-white px-1.5 py-0.5 rounded border border-slate-300 font-bold font-mono';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('ACCESO_PERIFERICO');
@@ -52,11 +106,25 @@ export default function App() {
   });
   const [fechaHoraTouched, setFechaHoraTouched] = useState(false);
 
-  // Cargar registros e información de webhook
+  const closeToast = useCallback(() => setToast(null), []);
+
   const reloadData = useCallback(() => {
     setRecords(getStoredRecords());
     setHasWebhook(Boolean(getStoredWebhookUrl()));
   }, []);
+
+  // Al abrir: limpiar claves viejas y enviar lo pendiente. Reintenta al volver la conexión.
+  useEffect(() => {
+    cleanupLegacyStorage();
+    void syncPendingRecords();
+    const onOnline = () => void syncPendingRecords();
+    window.addEventListener('online', onOnline);
+    window.addEventListener(RECORDS_CHANGED_EVENT, reloadData);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener(RECORDS_CHANGED_EVENT, reloadData);
+    };
+  }, [reloadData]);
 
   // Actualizar reloj solo si la enfermera no editó la fecha
   useEffect(() => {
@@ -78,7 +146,6 @@ export default function App() {
     });
   };
 
-  // Manejo de cambios en el paciente
   const handlePatientChange = useCallback((updated: Partial<BasePatientData>) => {
     if (updated.fechaHora !== undefined) {
       setFechaHoraTouched(true);
@@ -90,28 +157,34 @@ export default function App() {
     });
   }, []);
 
-  const afterSuccessfulSave = (prevCama: string) => {
+  const afterSuccessfulSave = (saved: BasePatientData) => {
+    const next = advancePlace(saved.sector, saved.habitacion, saved.cama);
     setFechaHoraTouched(false);
     setPatient((prev) => {
-      const nextPlace = stepBed(prev.sector, prev.habitacion, prevCama, 1);
-      const next = {
+      const updated = {
         ...prev,
         fechaHora: formatCurrentDateTime(),
-        habitacion: nextPlace.habitacion,
-        cama: nextPlace.cama,
+        habitacion: next.habitacion,
+        cama: next.cama,
         sexo: '' as const,
         fechaIngreso: '',
         historiaClinica: '',
       };
-      persistPatientMemory(next);
-      return next;
+      persistPatientMemory(updated);
+      return updated;
     });
+    return next;
   };
 
-  // Botón rápido: siguiente cama, o siguiente box/sillón en RCA
+  // Botón rápido: siguiente cama (pasa de habitación después de la última cama)
   const handleNextBed = useCallback(() => {
-    const next = stepBed(patient.sector, patient.habitacion, patient.cama, 1);
-    handlePatientChange(next);
+    const next = advancePlace(patient.sector, patient.habitacion, patient.cama);
+    if (next.sectorEnd) {
+      setToast({ type: 'warning', message: `Es el último lugar del sector ${patient.sector}.` });
+      haptics.warning();
+      return;
+    }
+    handlePatientChange({ habitacion: next.habitacion, cama: next.cama });
     setToast({
       type: 'success',
       message: `Avanzado a ${formatPlace(patient.sector, next.habitacion, next.cama)} (Sector ${patient.sector})`,
@@ -119,16 +192,26 @@ export default function App() {
     haptics.light();
   }, [patient.cama, patient.sector, patient.habitacion, handlePatientChange]);
 
-  // Atajos de teclado globales en Chromebook (no en Stats/Historial)
+  // Atajos globales (no en Stats/Historial): + / - cambian de cama, Enter guarda.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (activeTab === 'STATS' || activeTab === 'HISTORY') return;
+      const formId = FORM_IDS[activeTab];
+      if (!formId || isModalOpen()) return;
 
-      const activeTag = document.activeElement?.tagName.toLowerCase();
-      if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
+      if (e.key === 'Enter') {
+        // Enter en un campo de la cabecera (fuera del formulario) también guarda.
+        const el = document.activeElement as HTMLInputElement | null;
+        const inHeaderInput = el?.tagName === 'INPUT' && !el.form;
+        if (!inHeaderInput && (shouldIgnoreShortcut(e) || el?.tagName === 'BUTTON')) return;
+        const form = document.getElementById(formId) as HTMLFormElement | null;
+        if (form) {
+          e.preventDefault();
+          form.requestSubmit();
+        }
         return;
       }
 
+      if (shouldIgnoreShortcut(e)) return;
       if (e.key === '+' || e.key === '=') {
         e.preventDefault();
         handleNextBed();
@@ -145,113 +228,59 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeTab, handleNextBed, handlePatientChange, patient.cama, patient.habitacion, patient.sector]);
 
-  // Función para deshacer el último registro guardado
   const handleUndo = useCallback(
-    (recordId: string, prevPatient: BasePatientData) => {
-      deleteRecordLocally(recordId);
-      reloadData();
+    async (recordId: string, prevPatient: BasePatientData) => {
+      const record = getStoredRecords().find((r) => r.id === recordId);
       setPatient(prevPatient);
       persistPatientMemory(prevPatient);
       setFechaHoraTouched(true);
+      const message = record ? await undoRecord(record) : 'Registro deshecho.';
+      reloadData();
       setToast({
         type: 'warning',
-        message: `↩️ Registro deshecho. Vuelto a Sec ${prevPatient.sector} · ${formatPlace(prevPatient.sector, prevPatient.habitacion, prevPatient.cama)}`,
+        message: `↩️ ${message} Vuelto a Sec ${prevPatient.sector} · ${formatPlace(prevPatient.sector, prevPatient.habitacion, prevPatient.cama)}`,
       });
       haptics.warning();
     },
     [reloadData]
   );
 
-  // Guardar Acceso Periférico
-  const handleAccesoSubmit = async (formData: AccesoFormType) => {
+  const handleSubmit = async (formType: FormType, formData: AccesoFormType | UppFormType | SondaFormType) => {
     const prevPatient = { ...patient };
-    const res = await submitPatientRecord('ACCESO_PERIFERICO', formData);
+    const res = await submitPatientRecord(formType, formData);
     reloadData();
-    afterSuccessfulSave(patient.cama);
 
-    const situacionTexto = formData.tieneAcceso
-      ? 'Con vía'
-      : formData.tipoAccesoAlternativo === 'acceso_central'
-      ? 'Acceso Central'
-      : formData.tipoAccesoAlternativo === 'percutaneo'
-      ? 'Percutáneo'
-      : formData.motivoAusente || (formData.tipoAccesoAlternativo === 'ausente' ? 'Ausente' : 'Sin vía');
+    if (!res.success) {
+      setToast({ type: 'error', message: res.message, durationMs: 8000 });
+      haptics.warning();
+      return;
+    }
 
+    const next = afterSuccessfulSave(formData);
+    const recordId = res.recordId;
+    const fin = next.sectorEnd ? ' · Último lugar del sector' : '';
     setToast({
       type: 'success',
-      message: `✅ Vía: Sec ${formData.sector} · ${formatPlace(formData.sector, formData.habitacion, formData.cama)} (${situacionTexto})`,
-      action: res.recordId
-        ? {
-            label: 'Deshacer',
-            onClick: () => handleUndo(res.recordId!, prevPatient),
-          }
-        : undefined,
+      message: `✅ ${TOAST_PREFIX[formType]}: Sec ${formData.sector} · ${formatPlace(formData.sector, formData.habitacion, formData.cama)} (${situacionTexto(formType, formData)})${fin}`,
+      action: recordId ? { label: 'Deshacer', onClick: () => void handleUndo(recordId, prevPatient) } : undefined,
       durationMs: 5000,
     });
-
     haptics.success();
   };
 
-  // Guardar UPP
-  const handleUppSubmit = async (formData: UppFormType) => {
-    const prevPatient = { ...patient };
-    const res = await submitPatientRecord('UPP', formData);
-    reloadData();
-    afterSuccessfulSave(patient.cama);
-
-    const situacionUppTexto = formData.tieneUpp
-      ? 'Con LPP'
-      : formData.motivoAusente
-      ? formData.motivoAusente
-      : 'Piel Íntegra';
-
-    setToast({
-      type: 'success',
-      message: `✅ LPP: Sec ${formData.sector} · ${formatPlace(formData.sector, formData.habitacion, formData.cama)} (${situacionUppTexto})`,
-      action: res.recordId
-        ? {
-            label: 'Deshacer',
-            onClick: () => handleUndo(res.recordId!, prevPatient),
-          }
-        : undefined,
-      durationMs: 5000,
-    });
-
-    haptics.success();
+  const counts: Partial<Record<ActiveTab, number>> = {
+    ACCESO_PERIFERICO: records.filter((r) => r.formType === 'ACCESO_PERIFERICO').length,
+    UPP: records.filter((r) => r.formType === 'UPP').length,
+    SONDA_VESICAL: records.filter((r) => r.formType === 'SONDA_VESICAL').length,
+    HISTORY: records.length,
   };
-
-  const handleSondaSubmit = async (formData: SondaFormType) => {
-    const prevPatient = { ...patient };
-    const res = await submitPatientRecord('SONDA_VESICAL', formData);
-    reloadData();
-    afterSuccessfulSave(patient.cama);
-
-    const situacionSonda = formData.tieneSonda === 'SI'
-      ? `Con sonda Fr ${formData.numeroSonda || '?'}`
-      : formData.motivoAusente || 'Sin sonda';
-
-    setToast({
-      type: 'success',
-      message: `✅ Sonda: Sec ${formData.sector} · ${formatPlace(formData.sector, formData.habitacion, formData.cama)} (${situacionSonda})`,
-      action: res.recordId
-        ? {
-            label: 'Deshacer',
-            onClick: () => handleUndo(res.recordId!, prevPatient),
-          }
-        : undefined,
-      durationMs: 5000,
-    });
-
-    haptics.success();
-  };
-
-  const viasRecords = records.filter((r) => r.formType === 'ACCESO_PERIFERICO');
-  const uppRecords = records.filter((r) => r.formType === 'UPP');
-  const sondaRecords = records.filter((r) => r.formType === 'SONDA_VESICAL');
-  const pendingCount = records.filter((r) => r.syncStatus !== 'SYNCED').length;
+  const pendingCount = records.filter((r) => !isRecordSynced(r)).length;
+  const formKey = `${patient.sector}-${patient.habitacion}-${patient.cama}`;
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col antialiased selection:bg-sky-200">
+      <UpdateBanner />
+
       {/* Barra de Navegación Principal Superior */}
       <header className="bg-white/90 backdrop-blur-xl border-b border-slate-200/80 px-3 py-2.5 md:px-6 flex items-center justify-between shadow-[var(--shadow-rest)] sticky top-0 z-30 transition-[box-shadow,border-color] duration-[var(--duration-base)] ease-[var(--ease-standard)]" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 0.625rem)' }}>
         <div className="flex items-center gap-2.5">
@@ -266,7 +295,7 @@ export default function App() {
               </span>
             </div>
             <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
-              <span className="font-medium text-slate-700">Turno 8:00 a 16:00 hs</span>
+              <span className="font-medium text-slate-700">Turno {SHIFT_LABEL}</span>
               <span>·</span>
               {hasWebhook ? (
                 <span className="text-sky-700 font-semibold flex items-center gap-0.5">
@@ -282,12 +311,12 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Botón Cierre de Turno en Header */}
           <button
             type="button"
             onClick={() => setIsShiftModalOpen(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-sm)] bg-linear-to-r from-amber-500 to-orange-500 text-white font-bold text-xs shadow-[var(--shadow-rest)] hover:shadow-[var(--shadow-hover)] hover:scale-[1.015] active:scale-[0.98] transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] cursor-pointer"
-            title="Ver resumen y cerrar turno a las 16:00 hs"
+            title={`Ver resumen y cerrar turno (${SHIFT_LABEL})`}
+            aria-label="Cierre de turno"
           >
             <Award className="w-4 h-4" />
             <span className="hidden sm:inline">Cierre de Turno</span>
@@ -298,6 +327,7 @@ export default function App() {
             onClick={() => setIsSettingsOpen(true)}
             className="p-2 rounded-[var(--radius-sm)] text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-slate-200/90 shadow-[var(--shadow-rest)] hover:shadow-[var(--shadow-hover)] active:scale-[0.98] transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] cursor-pointer"
             title="Configurar Webhook y Planilla"
+            aria-label="Configuración"
           >
             <Settings className="w-4 h-4" />
           </button>
@@ -308,163 +338,82 @@ export default function App() {
       <div className="flex-1 w-full max-w-6xl mx-auto p-2 sm:p-4 lg:grid lg:grid-cols-12 lg:gap-5">
         {/* PANEL IZQUIERDO: Panel de Control de Ronda */}
         <aside aria-label="Panel de control del turno" className="hidden lg:block lg:col-span-4 space-y-4">
-          {/* Tarjeta de Ronda y Estado del Turno */}
           <div className="bg-white p-4 rounded-[var(--radius-lg)] border border-slate-200/80 shadow-[var(--shadow-rest)] space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Relevamiento del Día</span>
-              <span className="text-xs font-extrabold bg-sky-100 text-sky-800 px-2.5 py-0.5 rounded-full">
-                8:00 - 16:00 hs
-              </span>
+              <span className="text-xs font-extrabold bg-sky-100 text-sky-800 px-2.5 py-0.5 rounded-full">{SHIFT_LABEL}</span>
             </div>
 
-            <div className="space-y-2">
-              <button
-                type="button"
-                onClick={() => setActiveTab('ACCESO_PERIFERICO')}
-                className={`w-full p-3 rounded-[var(--radius-md)] border text-left flex items-center justify-between transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] hover:-translate-y-0.5 cursor-pointer ${
-                  activeTab === 'ACCESO_PERIFERICO'
-                    ? 'bg-sky-50/90 border-sky-400 text-sky-950 ring-2 ring-sky-200 shadow-[var(--shadow-rest)]'
-                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-sky-600 text-white flex items-center justify-center shadow-xs">
-                    <Syringe className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="font-extrabold text-sm block leading-tight">Ronda 1: Vías Periféricas</span>
-                    <span className="text-[11px] text-slate-600">Inspección de catéteres y rótulos</span>
-                  </div>
-                </div>
-                <span className="font-black text-base text-sky-800">{viasRecords.length}</span>
-              </button>
+            <nav className="space-y-2" aria-label="Rondas">
+              {SIDEBAR_ITEMS.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.tab;
+                const count = counts[item.tab];
+                return (
+                  <button
+                    key={item.tab}
+                    type="button"
+                    onClick={() => setActiveTab(item.tab)}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={`w-full p-3 rounded-[var(--radius-md)] border text-left flex items-center justify-between transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] hover:-translate-y-0.5 cursor-pointer ${
+                      isActive
+                        ? `${item.active} shadow-[var(--shadow-rest)]`
+                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-8 h-8 rounded-[var(--radius-sm)] ${item.iconBg} text-white flex items-center justify-center shadow-xs`}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="font-extrabold text-sm block leading-tight">{item.title}</span>
+                        <span className="text-[11px] text-slate-600">{item.subtitle}</span>
+                      </div>
+                    </div>
+                    {count !== undefined && <span className={`font-black text-base ${item.countColor}`}>{count}</span>}
+                  </button>
+                );
+              })}
+            </nav>
 
-              <button
-                type="button"
-                onClick={() => setActiveTab('UPP')}
-                className={`w-full p-3 rounded-[var(--radius-md)] border text-left flex items-center justify-between transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] hover:-translate-y-0.5 cursor-pointer ${
-                  activeTab === 'UPP'
-                    ? 'bg-rose-50/90 border-rose-400 text-rose-950 ring-2 ring-rose-200 shadow-[var(--shadow-rest)]'
-                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-rose-600 text-white flex items-center justify-center shadow-xs">
-                    <Bandage className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="font-extrabold text-sm block leading-tight">Ronda 2: LPP</span>
-                    <span className="text-[11px] text-slate-600">Piel, Braden y colchones</span>
-                  </div>
-                </div>
-                <span className="font-black text-base text-rose-800">{uppRecords.length}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('SONDA_VESICAL')}
-                className={`w-full p-3 rounded-[var(--radius-md)] border text-left flex items-center justify-between transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] hover:-translate-y-0.5 cursor-pointer ${
-                  activeTab === 'SONDA_VESICAL'
-                    ? 'bg-teal-50/90 border-teal-400 text-teal-950 ring-2 ring-teal-200 shadow-[var(--shadow-rest)]'
-                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-teal-600 text-white flex items-center justify-center shadow-xs">
-                    <Droplets className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="font-extrabold text-sm block leading-tight">Ronda 3: Sondas vesicales</span>
-                    <span className="text-[11px] text-slate-600">Graduación, lúmenes y fijación</span>
-                  </div>
-                </div>
-                <span className="font-black text-base text-teal-800">{sondaRecords.length}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('STATS')}
-                className={`w-full p-3 rounded-[var(--radius-md)] border text-left flex items-center justify-between transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] hover:-translate-y-0.5 cursor-pointer ${
-                  activeTab === 'STATS'
-                    ? 'bg-indigo-50/90 border-indigo-400 text-indigo-950 ring-2 ring-indigo-200 shadow-[var(--shadow-rest)]'
-                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-indigo-600 text-white flex items-center justify-center shadow-xs">
-                    <BarChart3 className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="font-extrabold text-sm block leading-tight">Estadísticas</span>
-                    <span className="text-[11px] text-slate-600">Resumen de la ronda</span>
-                  </div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('HISTORY')}
-                className={`w-full p-3 rounded-[var(--radius-md)] border text-left flex items-center justify-between transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] hover:-translate-y-0.5 cursor-pointer ${
-                  activeTab === 'HISTORY'
-                    ? 'bg-slate-100 border-slate-400 text-slate-950 ring-2 ring-slate-300 shadow-[var(--shadow-rest)]'
-                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-slate-600 text-white flex items-center justify-center shadow-xs">
-                    <ClipboardList className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="font-extrabold text-sm block leading-tight">Historial</span>
-                    <span className="text-[11px] text-slate-600">Registros del turno</span>
-                  </div>
-                </div>
-                <span className="font-black text-base text-slate-700">{records.length}</span>
-              </button>
-            </div>
-
-            {/* Atajos de Chromebook */}
             <div className="p-3 bg-slate-50 rounded-[var(--radius-md)] border border-slate-200/80 text-xs space-y-1.5">
               <span className="font-bold text-slate-700 flex items-center gap-1.5">
                 <Keyboard className="w-3.5 h-3.5 text-sky-700" />
                 Atajos de Teclado (Chromebook)
               </span>
               <ul className="text-[11px] text-slate-600 space-y-1">
-                <li><kbd className="bg-white px-1.5 py-0.5 rounded border border-slate-300 font-bold font-mono">N</kbd> Selecciona NO</li>
-                <li><kbd className="bg-white px-1.5 py-0.5 rounded border border-slate-300 font-bold font-mono">S</kbd> Selecciona SÍ</li>
-                <li><kbd className="bg-white px-1.5 py-0.5 rounded border border-slate-300 font-bold font-mono">Enter</kbd> Guardar y avanzar cama</li>
-                <li><kbd className="bg-white px-1.5 py-0.5 rounded border border-slate-300 font-bold font-mono">+</kbd> / <kbd className="bg-white px-1.5 py-0.5 rounded border border-slate-300 font-bold font-mono">-</kbd> Cambiar cama</li>
+                <li><kbd className={KBD}>N</kbd> Selecciona NO</li>
+                <li><kbd className={KBD}>S</kbd> Selecciona SÍ</li>
+                <li><kbd className={KBD}>Enter</kbd> Guardar y avanzar cama</li>
+                <li><kbd className={KBD}>+</kbd> / <kbd className={KBD}>-</kbd> Cambiar cama</li>
               </ul>
             </div>
 
-            {/* Botón Cierre de Turno */}
             <button
               type="button"
               onClick={() => setIsShiftModalOpen(true)}
               className="w-full py-3 rounded-[var(--radius-md)] bg-linear-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-[var(--shadow-rest)] hover:shadow-[var(--shadow-hover)] active:scale-[0.98] hover:scale-[1.015] transition-[transform,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] cursor-pointer"
             >
               <Award className="w-4 h-4" />
-              <span>Resumen y Cierre de Turno (16:00 hs)</span>
+              <span>Resumen y Cierre de Turno ({SHIFT_LABEL})</span>
             </button>
           </div>
         </aside>
 
         {/* PANEL DERECHO: Formulario Activo y Cabecera */}
         <main className="lg:col-span-8 flex flex-col space-y-2">
-          {/* Selector de Módulo (Visible en móvil / tablet) */}
           <div className="w-full lg:hidden">
             <ModuleTabs
               activeTab={activeTab}
               onSelectTab={setActiveTab}
-              viasCount={viasRecords.length}
-              uppCount={uppRecords.length}
-              sondaCount={sondaRecords.length}
+              viasCount={counts.ACCESO_PERIFERICO ?? 0}
+              uppCount={counts.UPP ?? 0}
+              sondaCount={counts.SONDA_VESICAL ?? 0}
               historyCount={records.length}
               pendingCount={pendingCount}
             />
           </div>
 
-          {/* Cabecera Persistente de Paciente */}
           {activeTab !== 'HISTORY' && activeTab !== 'STATS' && (
             <div className="w-full">
               <PatientHeader
@@ -472,58 +421,49 @@ export default function App() {
                 onChange={handlePatientChange}
                 onNextBed={handleNextBed}
                 activeRound={activeTab}
-                totalCensadasHoy={records.length}
+                totalCensadasHoy={records.filter((r) => recordDay(r) === localDateISO()).length}
                 records={records}
               />
             </div>
           )}
 
-          {/* Formularios */}
           <div className="w-full pt-1">
             {activeTab === 'ACCESO_PERIFERICO' && (
               <AccesoPerifericoForm
-                key={`${patient.sector}-${patient.habitacion}-${patient.cama}`}
+                key={formKey}
                 patient={patient}
-                onSubmit={handleAccesoSubmit}
+                onSubmit={(data) => handleSubmit('ACCESO_PERIFERICO', data)}
                 onSwitchToUpp={() => setActiveTab('UPP')}
               />
             )}
 
             {activeTab === 'UPP' && (
               <UppForm
-                key={`${patient.sector}-${patient.habitacion}-${patient.cama}`}
+                key={formKey}
                 patient={patient}
-                onSubmit={handleUppSubmit}
+                onSubmit={(data) => handleSubmit('UPP', data)}
                 onOpenShiftClose={() => setIsShiftModalOpen(true)}
               />
             )}
 
             {activeTab === 'SONDA_VESICAL' && (
-              <SondaVesicalForm
-                key={`${patient.sector}-${patient.habitacion}-${patient.cama}`}
-                patient={patient}
-                onSubmit={handleSondaSubmit}
-              />
+              <SondaVesicalForm key={formKey} patient={patient} onSubmit={(data) => handleSubmit('SONDA_VESICAL', data)} />
             )}
 
-            {activeTab === 'HISTORY' && (
-              <HistoryView records={records} onRefresh={reloadData} />
-            )}
+            {activeTab === 'HISTORY' && <HistoryView records={records} onRefresh={reloadData} />}
 
-            {activeTab === 'STATS' && (
-              <StatsView hasWebhook={hasWebhook} />
-            )}
+            {activeTab === 'STATS' && <StatsView hasWebhook={hasWebhook} />}
           </div>
         </main>
       </div>
 
-      {/* Modales y Notificaciones */}
       {isSettingsOpen && (
         <SettingsModal
           isOpen={isSettingsOpen}
           onClose={() => {
             setIsSettingsOpen(false);
             reloadData();
+            void syncPendingRecords();
           }}
           onHistoryCleared={reloadData}
         />
@@ -538,7 +478,7 @@ export default function App() {
         />
       )}
 
-      <ToastNotification toast={toast} onClose={() => setToast(null)} />
+      <ToastNotification toast={toast} onClose={closeToast} />
     </div>
   );
 }

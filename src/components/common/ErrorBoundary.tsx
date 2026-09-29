@@ -25,7 +25,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('ErrorBoundary capturó un error no controlado:', error, errorInfo);
-    this.setState({ error, errorInfo });
+    this.setState({ errorInfo });
   }
 
   private handleReload = () => {

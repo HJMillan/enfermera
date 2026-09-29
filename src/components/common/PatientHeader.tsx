@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Bed,
   DoorOpen,
@@ -31,6 +31,7 @@ import {
 import { getStaffBySector, saveStaffBySector } from '../../services/storageService';
 import { useWakeLock } from '../../hooks/useWakeLock';
 import { SectorBedMatrixModal } from './SectorBedMatrixModal';
+import { useCensadasHoy } from '../../hooks/useCensadasHoy';
 
 interface PatientHeaderProps {
   patient: BasePatientData;
@@ -113,15 +114,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
   const placeBased = isPlaceSector(patient.sector);
   const totalBedsSector = sectorPlaceCount(patient.sector);
 
-  const censadasSector = useMemo(() => {
-    const set = new Set<string>();
-    records
-      .filter((r) => r.formType === activeRound && r.data.sector === patient.sector)
-      .forEach((r) => {
-        set.add(`${r.data.habitacion}-${r.data.cama}`);
-      });
-    return set.size;
-  }, [records, activeRound, patient.sector]);
+  const censadasSector = useCensadasHoy(records, activeRound, patient.sector).size;
 
   return (
     <div className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-[var(--shadow-rest)] sticky z-20 px-2.5 py-2 md:px-4 md:py-3 transition-[box-shadow,border-color] duration-[var(--duration-base)] ease-[var(--ease-standard)]" style={{ top: 'var(--header-height)' }}>
@@ -195,7 +188,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
 
           {totalCensadasHoy > 0 && (
             <span className="text-[11px] font-bold text-slate-600 hidden sm:inline shrink-0">
-              · {totalCensadasHoy} camas hoy
+              · {totalCensadasHoy} registros hoy
             </span>
           )}
         </div>
@@ -218,7 +211,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
             title={
               placeBased
                 ? 'Pasar al siguiente lugar del sector'
-                : 'Mantener sector y habitación, e incrementar la cama'
+                : 'Siguiente cama (después de la última pasa a la próxima habitación)'
             }
           >
             <Bed className="w-3.5 h-3.5" />
@@ -238,6 +231,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
             key={sec}
             type="button"
             onClick={() => handleSectorChange(sec)}
+            aria-pressed={patient.sector === sec}
             className={`min-w-9 md:min-w-10 h-8 md:h-9 px-2 md:px-2.5 rounded-[var(--radius-sm)] font-bold text-xs md:text-sm border transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer shrink-0 ${
               patient.sector === sec
                 ? 'bg-sky-700 text-white border-sky-700 shadow-[var(--shadow-rest)] ring-2 ring-sky-200 hover:scale-[1.015]'
@@ -343,6 +337,8 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
                         key={`${group.habitacion}-${num}`}
                         type="button"
                         onClick={() => onChange({ habitacion: group.habitacion, cama: num })}
+                        aria-pressed={selected}
+                        aria-label={`${placeGroupTitle(group.noun)} ${num}`}
                         className={`shrink-0 w-9 h-9 rounded-[var(--radius-sm)] font-bold text-xs border transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer ${
                           selected
                             ? 'bg-sky-700 text-white border-sky-700 shadow-[var(--shadow-rest)] ring-2 ring-sky-200'
@@ -384,6 +380,8 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
               <input
                 type="text"
                 inputMode="numeric"
+                aria-label="Habitación"
+                aria-invalid={!isRoomValid}
                 value={patient.habitacion}
                 onChange={(e) => onChange({ habitacion: e.target.value })}
                 placeholder="101"
@@ -422,6 +420,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
             </span>
             <input
               type="text"
+              aria-label="Historia clínica"
               value={patient.historiaClinica || ''}
               onChange={(e) => onChange({ historiaClinica: e.target.value })}
               placeholder="N° HC"
@@ -443,6 +442,8 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
                 key={bedNum}
                 type="button"
                 onClick={() => onChange({ cama: bedNum })}
+                aria-pressed={patient.cama === bedNum}
+                aria-label={`Cama ${bedNum}`}
                 className={`flex-1 sm:flex-none w-10 h-10 rounded-[var(--radius-sm)] font-bold text-xs md:text-sm border transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer ${
                   patient.cama === bedNum
                     ? 'bg-sky-700 text-white border-sky-700 shadow-[var(--shadow-rest)] ring-2 ring-sky-200 hover:scale-[1.015]'
@@ -493,6 +494,7 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
                 key={opt.id}
                 type="button"
                 onClick={() => onChange({ sexo: opt.id })}
+                aria-pressed={patient.sexo === opt.id}
                 className={`min-h-9 px-3 rounded-[var(--radius-sm)] font-bold text-xs border transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer ${
                   patient.sexo === opt.id
                     ? 'bg-sky-700 text-white border-sky-700 shadow-[var(--shadow-rest)]'

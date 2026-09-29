@@ -2,6 +2,8 @@ import React, { useMemo } from 'react';
 import { X, CheckCircle2, Bed, MapPin } from 'lucide-react';
 import type { SectorType, FormType, StoredRecord } from '../../types/form';
 import { getValidRooms, COMMON_BEDS, isPlaceSector, PLACE_SECTORS, placeGroupTitle, sectorPlaceCount } from '../../config/sectorConfig';
+import { useCensadasHoy } from '../../hooks/useCensadasHoy';
+import { ModalShell } from './ModalShell';
 
 interface SectorBedMatrixModalProps {
   isOpen: boolean;
@@ -12,6 +14,41 @@ interface SectorBedMatrixModalProps {
   activeRound?: FormType | 'HISTORY';
   records: StoredRecord[];
   onSelectBed: (habitacion: string, cama: string) => void;
+}
+
+interface BedButtonProps {
+  label: string;
+  title: string;
+  censada: boolean;
+  selected: boolean;
+  onClick: () => void;
+}
+
+function BedButton({ label, title, censada, selected, onClick }: BedButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      aria-label={`${title}: ${censada ? 'censada hoy' : 'pendiente'}`}
+      className={`min-h-[44px] rounded-[var(--radius-sm)] font-bold text-xs flex flex-col items-center justify-center transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] cursor-pointer border ${
+        selected
+          ? 'bg-sky-600 text-white border-sky-600 shadow-[var(--shadow-rest)] ring-2 ring-sky-300'
+          : censada
+            ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 hover:shadow-[var(--shadow-rest)]'
+            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-white hover:shadow-[var(--shadow-rest)]'
+      }`}
+      title={`${title} (${censada ? 'Censada' : 'Pendiente'})`}
+    >
+      <span className="flex items-center gap-0.5">
+        <Bed className="w-3 h-3" />
+        <span>{label}</span>
+      </span>
+      <span className="text-[9px] font-semibold leading-tight" aria-hidden>
+        {censada ? <CheckCircle2 className="w-2.5 h-2.5 inline text-emerald-600" /> : 'Pend'}
+      </span>
+    </button>
+  );
 }
 
 export const SectorBedMatrixModal: React.FC<SectorBedMatrixModalProps> = ({
@@ -25,244 +62,171 @@ export const SectorBedMatrixModal: React.FC<SectorBedMatrixModalProps> = ({
   onSelectBed,
 }) => {
   const validRooms = useMemo(() => getValidRooms(sector), [sector]);
-  const placeBased = isPlaceSector(sector);
-  const placeLayout = PLACE_SECTORS[sector];
-
-  // Mapa de camas censadas en el sector para la ronda activa
-  const censadasSet = useMemo(() => {
-    const set = new Set<string>();
-    records
-      .filter((r) => r.formType === activeRound && r.data.sector === sector)
-      .forEach((r) => {
-        set.add(`${r.data.habitacion}-${r.data.cama}`);
-      });
-    return set;
-  }, [records, activeRound, sector]);
+  const censadasSet = useCensadasHoy(records, activeRound, sector);
 
   if (!isOpen) return null;
 
-  const totalBeds = placeBased ? sectorPlaceCount(sector) : validRooms.length * 4;
+  const placeBased = isPlaceSector(sector);
+  const placeLayout = PLACE_SECTORS[sector];
+  const totalBeds = sectorPlaceCount(sector);
   const placeWord = sector === 'RCA' ? 'lugares' : 'camas';
   const censadasCount = censadasSet.size;
-  const progressPercent = totalBeds > 0 ? Math.round((censadasCount / totalBeds) * 100) : 0;
+  const progressPercent = totalBeds > 0 ? Math.min(100, Math.round((censadasCount / totalBeds) * 100)) : 0;
 
   const isVias = activeRound === 'ACCESO_PERIFERICO';
   const isSondas = activeRound === 'SONDA_VESICAL';
 
+  const select = (habitacion: string, cama: string) => {
+    onSelectBed(habitacion, cama);
+    onClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-950/60 backdrop-blur-md transition-opacity duration-[var(--duration-base)] ease-[var(--ease-smooth)]">
-      <div className="bg-white w-full max-w-xl rounded-[var(--radius-lg)] shadow-[var(--shadow-elevated)] border border-slate-200/80 overflow-hidden flex flex-col max-h-[90vh] transition-[transform,box-shadow] duration-[var(--duration-base)] ease-[var(--ease-standard)]">
-        {/* Cabecera del Modal */}
-        <div
-          className={`p-4 border-b text-white flex items-center justify-between ${
-            isVias
-              ? 'bg-gradient-to-r from-sky-700 to-cyan-700 border-sky-800'
-              : isSondas
+    <ModalShell labelledBy="bed-matrix-title" onClose={onClose} panelClassName="max-w-xl max-h-[90vh]">
+      <div
+        className={`p-4 border-b text-white flex items-center justify-between ${
+          isVias
+            ? 'bg-gradient-to-r from-sky-700 to-cyan-700 border-sky-800'
+            : isSondas
               ? 'bg-gradient-to-r from-teal-700 to-emerald-700 border-teal-800'
               : 'bg-gradient-to-r from-rose-700 to-pink-700 border-rose-800'
-          }`}
-        >
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-[var(--radius-sm)] bg-white/20 flex items-center justify-center backdrop-blur-xs">
-              <MapPin className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h2 className="font-black text-base md:text-lg leading-tight">
-                Mapa de {sector === 'RCA' ? 'lugares' : 'camas'} · Sector {sector}
-              </h2>
-              <p className="text-xs text-white/80">
-                {isVias ? 'Ronda 1: Vías Periféricas' : isSondas ? 'Ronda 3: Sondas vesicales' : 'Ronda 2: LPP'}
-              </p>
-            </div>
+        }`}
+      >
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-[var(--radius-sm)] bg-white/20 flex items-center justify-center backdrop-blur-xs">
+            <MapPin className="w-5 h-5 text-white" />
           </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-[var(--radius-sm)] text-white/80 hover:text-white hover:bg-white/10 transition-[transform,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer"
-            title="Cerrar mapa"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Barra de Progreso y Leyenda */}
-        <div className="p-3.5 bg-slate-50 border-b border-slate-200 space-y-2.5 text-xs">
-          <div className="flex items-center justify-between font-bold text-slate-700">
-            <span>Progreso del Sector</span>
-            <span className="font-mono text-sky-800 font-extrabold">
-              {censadasCount} de {totalBeds} {placeWord} ({progressPercent}%)
-            </span>
-          </div>
-
-          {/* Barra de Progreso */}
-          <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
-            <div
-              className={`h-full transition-all duration-[var(--duration-slow)] ease-[var(--ease-standard)] ${
-                isVias ? 'bg-sky-600' : isSondas ? 'bg-teal-600' : 'bg-rose-600'
-              }`}
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-
-          {/* Leyenda */}
-          <div className="flex items-center gap-3 pt-1 flex-wrap text-[11px] text-slate-600 font-medium">
-            <div className="flex items-center gap-1.5">
-              <div className="w-3.5 h-3.5 rounded bg-emerald-100 border border-emerald-400" />
-              <span>Censada hoy</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3.5 h-3.5 rounded bg-slate-100 border border-slate-300" />
-              <span>Pendiente</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3.5 h-3.5 rounded bg-sky-600 border border-sky-600" />
-              <span className="font-bold text-sky-900">{sector === 'RCA' ? 'Lugar actual' : 'Cama actual'}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Grilla de Habitaciones y Camas */}
-        <div className="p-3.5 overflow-y-auto flex-1 space-y-2.5">
-          {placeBased && placeLayout ? (
-            <div className="space-y-3">
-              {placeLayout.groups.map((group) => (
-                <div
-                  key={group.habitacion}
-                  className="p-3 rounded-[var(--radius-md)] border border-slate-200 bg-white shadow-[var(--shadow-rest)]"
-                >
-                  <span className="font-extrabold text-xs text-slate-800 block mb-2">
-                    {placeGroupTitle(group.noun)}
-                  </span>
-                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
-                    {Array.from({ length: group.count }, (_, i) => String(i + 1)).map((bed) => {
-                      const isCensada = censadasSet.has(`${group.habitacion}-${bed}`);
-                      const isSelected = currentRoom === group.habitacion && currentBed === bed;
-                      const placeName =
-                        group.habitacion === sector ? `${group.noun} ${bed}` : `${group.habitacion} ${bed}`;
-                      return (
-                        <button
-                          key={bed}
-                          type="button"
-                          onClick={() => {
-                            onSelectBed(group.habitacion, bed);
-                            onClose();
-                          }}
-                          className={`min-h-[44px] rounded-[var(--radius-sm)] font-bold text-xs flex flex-col items-center justify-center transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] cursor-pointer border ${
-                            isSelected
-                              ? 'bg-sky-600 text-white border-sky-600 shadow-[var(--shadow-rest)] ring-2 ring-sky-300'
-                              : isCensada
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 hover:shadow-[var(--shadow-rest)]'
-                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-white hover:shadow-[var(--shadow-rest)]'
-                          }`}
-                          title={`${placeName} (${isCensada ? 'Censada' : 'Pendiente'})`}
-                        >
-                          <span className="flex items-center gap-0.5">
-                            <Bed className="w-3 h-3" />
-                            <span>{bed}</span>
-                          </span>
-                          <span className="text-[9px] font-semibold leading-tight">
-                            {isCensada ? (
-                              <CheckCircle2 className="w-2.5 h-2.5 inline text-emerald-600" />
-                            ) : (
-                              'Pend'
-                            )}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : validRooms.length === 0 ? (
-            <p className="text-center text-sm text-slate-500 py-6">
-              No hay habitaciones configuradas para este sector.
+          <div>
+            <h2 id="bed-matrix-title" className="font-black text-base md:text-lg leading-tight">
+              Mapa de {placeWord} · Sector {sector}
+            </h2>
+            <p className="text-xs text-white/80">
+              {isVias ? 'Ronda 1: Vías Periféricas' : isSondas ? 'Ronda 3: Sondas vesicales' : 'Ronda 2: LPP'}
             </p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {validRooms.map((room) => {
-                const roomStr = String(room);
-                const isCurrentRoom = currentRoom === roomStr;
-
-                return (
-                  <div
-                    key={room}
-                    className={`p-3 rounded-[var(--radius-md)] border transition-[border-color,background-color] duration-[var(--duration-base)] ease-[var(--ease-standard)] shadow-[var(--shadow-rest)] ${
-                      isCurrentRoom
-                        ? 'border-sky-400 bg-sky-50/40 ring-1 ring-sky-300'
-                        : 'border-slate-200 bg-white hover:border-slate-300'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-extrabold text-xs text-slate-800 flex items-center gap-1">
-                        <span>Habitación {room}</span>
-                        {isCurrentRoom && (
-                          <span className="text-[10px] bg-sky-600 text-white font-bold px-1.5 py-0.2 rounded-[var(--radius-sm)]">
-                            Actual
-                          </span>
-                        )}
-                      </span>
-                    </div>
-
-                    {/* Chips de las 4 Camas de la Habitación */}
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {COMMON_BEDS.map((bed) => {
-                        const isCensada = censadasSet.has(`${roomStr}-${bed}`);
-                        const isSelected = isCurrentRoom && currentBed === bed;
-
-                        return (
-                          <button
-                            key={bed}
-                            type="button"
-                            onClick={() => {
-                              onSelectBed(roomStr, bed);
-                              onClose();
-                            }}
-                            className={`min-h-[44px] rounded-[var(--radius-sm)] font-bold text-xs flex flex-col items-center justify-center transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] hover:scale-[1.015] cursor-pointer border ${
-                              isSelected
-                                ? 'bg-sky-600 text-white border-sky-600 shadow-[var(--shadow-rest)] ring-2 ring-sky-300'
-                                : isCensada
-                                ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 hover:shadow-[var(--shadow-rest)]'
-                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-white hover:shadow-[var(--shadow-rest)]'
-                            }`}
-                            title={`Habitación ${room} Cama ${bed} (${
-                              isCensada ? 'Censada' : 'Pendiente'
-                            })`}
-                          >
-                            <span className="flex items-center gap-0.5">
-                              <Bed className="w-3 h-3" />
-                              <span>{bed}</span>
-                            </span>
-                            <span className="text-[9px] font-semibold leading-tight">
-                              {isCensada ? (
-                                <CheckCircle2 className="w-2.5 h-2.5 inline text-emerald-600" />
-                              ) : (
-                                'Pend'
-                              )}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          </div>
         </div>
 
-        {/* Pie del modal */}
-        <div className="p-3 bg-slate-50 border-t border-slate-100 text-center">
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full py-2.5 rounded-xl bg-slate-200 text-slate-800 hover:bg-slate-300 font-bold text-xs touch-active cursor-pointer"
-          >
-            Volver al Formulario
-          </button>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Cerrar mapa"
+          className="p-1.5 rounded-[var(--radius-sm)] text-white/80 hover:text-white hover:bg-white/10 transition-[transform,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      <div className="p-3.5 bg-slate-50 border-b border-slate-200 space-y-2.5 text-xs">
+        <div className="flex items-center justify-between font-bold text-slate-700">
+          <span>Progreso del sector hoy</span>
+          <span className="font-mono text-sky-800 font-extrabold">
+            {censadasCount} de {totalBeds} {placeWord} ({progressPercent}%)
+          </span>
+        </div>
+
+        <div
+          className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={progressPercent}
+          aria-label="Progreso del sector"
+        >
+          <div
+            className={`h-full transition-all duration-[var(--duration-slow)] ease-[var(--ease-standard)] ${
+              isVias ? 'bg-sky-600' : isSondas ? 'bg-teal-600' : 'bg-rose-600'
+            }`}
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+
+        <div className="flex items-center gap-3 pt-1 flex-wrap text-[11px] text-slate-600 font-medium">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3.5 h-3.5 rounded bg-emerald-100 border border-emerald-400" />
+            <span>Censada hoy</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3.5 h-3.5 rounded bg-slate-100 border border-slate-300" />
+            <span>Pendiente</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3.5 h-3.5 rounded bg-sky-600 border border-sky-600" />
+            <span className="font-bold text-sky-900">{sector === 'RCA' ? 'Lugar actual' : 'Cama actual'}</span>
+          </div>
         </div>
       </div>
-    </div>
+
+      <div className="p-3.5 overflow-y-auto flex-1 space-y-2.5">
+        {placeBased && placeLayout ? (
+          <div className="space-y-3">
+            {placeLayout.groups.map((group) => (
+              <div key={group.habitacion} className="p-3 rounded-[var(--radius-md)] border border-slate-200 bg-white shadow-[var(--shadow-rest)]">
+                <span className="font-extrabold text-xs text-slate-800 block mb-2">{placeGroupTitle(group.noun)}</span>
+                <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
+                  {Array.from({ length: group.count }, (_, i) => String(i + 1)).map((bed) => (
+                    <BedButton
+                      key={bed}
+                      label={bed}
+                      title={group.habitacion === sector ? `${group.noun} ${bed}` : `${group.habitacion} ${bed}`}
+                      censada={censadasSet.has(`${group.habitacion}-${bed}`)}
+                      selected={currentRoom === group.habitacion && currentBed === bed}
+                      onClick={() => select(group.habitacion, bed)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : validRooms.length === 0 ? (
+          <p className="text-center text-sm text-slate-500 py-6">No hay habitaciones configuradas para este sector.</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {validRooms.map((room) => {
+              const roomStr = String(room);
+              const isCurrentRoom = currentRoom === roomStr;
+              return (
+                <div
+                  key={room}
+                  className={`p-3 rounded-[var(--radius-md)] border transition-[border-color,background-color] duration-[var(--duration-base)] ease-[var(--ease-standard)] shadow-[var(--shadow-rest)] ${
+                    isCurrentRoom ? 'border-sky-400 bg-sky-50/40 ring-1 ring-sky-300' : 'border-slate-200 bg-white hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-extrabold text-xs text-slate-800 flex items-center gap-1">
+                      <span>Habitación {room}</span>
+                      {isCurrentRoom && (
+                        <span className="text-[10px] bg-sky-600 text-white font-bold px-1.5 py-0.5 rounded-[var(--radius-sm)]">Actual</span>
+                      )}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {COMMON_BEDS.map((bed) => (
+                      <BedButton
+                        key={bed}
+                        label={bed}
+                        title={`Habitación ${room} Cama ${bed}`}
+                        censada={censadasSet.has(`${roomStr}-${bed}`)}
+                        selected={isCurrentRoom && currentBed === bed}
+                        onClick={() => select(roomStr, bed)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="p-3 bg-slate-50 border-t border-slate-100 text-center">
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-full py-2.5 rounded-xl bg-slate-200 text-slate-800 hover:bg-slate-300 font-bold text-xs touch-active cursor-pointer"
+        >
+          Volver al Formulario
+        </button>
+      </div>
+    </ModalShell>
   );
 };

@@ -33,6 +33,7 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({ toast, onC
   return (
     <aside
       aria-label="Notificaciones"
+      role={isSuccess ? 'status' : 'alert'}
       className="fixed left-3 right-3 md:left-auto md:right-4 md:max-w-md z-50 animate-fade-in"
       style={{ top: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
     >
@@ -70,6 +71,7 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({ toast, onC
           onClick={onClose}
           className="text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/10 shrink-0"
           title="Cerrar aviso"
+          aria-label="Cerrar aviso"
         >
           <X className="w-4 h-4" />
         </button>

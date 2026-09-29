@@ -33,6 +33,8 @@ export const ToggleYesNo: React.FC<ToggleYesNoProps> = ({
         <button
           type="button"
           onClick={() => (onUnset && value === true ? onUnset() : onChange(true))}
+          aria-pressed={value === true}
+          aria-label={label ? `${label}: ${yesText}` : undefined}
           className={`group min-h-[50px] rounded-[var(--radius-sm)] font-bold text-base flex items-center justify-center gap-2 border-2 transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer select-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1 ${
             value === true
               ? 'bg-emerald-600 border-emerald-600 text-white shadow-[var(--shadow-hover)] ring-2 ring-emerald-300/70 hover:scale-[1.015] hover:-translate-y-0.5'
@@ -46,6 +48,8 @@ export const ToggleYesNo: React.FC<ToggleYesNoProps> = ({
         <button
           type="button"
           onClick={() => (onUnset && value === false ? onUnset() : onChange(false))}
+          aria-pressed={value === false}
+          aria-label={label ? `${label}: ${noText}` : undefined}
           className={`group min-h-[50px] rounded-[var(--radius-sm)] font-bold text-base flex items-center justify-center gap-2 border-2 transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer select-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-1 ${
             value === false
               ? 'bg-rose-600 border-rose-600 text-white shadow-[var(--shadow-hover)] ring-2 ring-rose-300/70 hover:scale-[1.015] hover:-translate-y-0.5'

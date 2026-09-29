@@ -14,7 +14,9 @@ import type { BasePatientData, UppForm as UppFormType } from '../../types/form';
 import { ToggleYesNo } from '../common/ToggleYesNo';
 import { TouchChip } from '../common/TouchChip';
 import { BedStatusSelector } from '../common/BedStatusSelector';
-import { validateSharedPatient } from '../../utils/patientValidation';
+import { validatePlace, validateSharedPatient, validateUppForm } from '../../utils/patientValidation';
+import { shouldIgnoreShortcut } from '../../utils/keyboard';
+import { BRADEN, BRADEN_LABEL, bradenBand } from '../../config/clinical';
 import { formatPlace } from '../../config/sectorConfig';
 
 interface UppFormProps {
@@ -82,10 +84,7 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
   // Atajos de teclado en Chromebook
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const activeTag = document.activeElement?.tagName.toLowerCase();
-      if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
-        return;
-      }
+      if (shouldIgnoreShortcut(e)) return;
 
       if (e.key === 'n' || e.key === 'N') {
         e.preventDefault();
@@ -114,12 +113,13 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.motivoAusente) {
-      const sharedError = validateSharedPatient(patient);
-      if (sharedError) {
-        setError(sharedError);
-        return;
-      }
+    const validationError =
+      validatePlace(patient) ||
+      (form.motivoAusente ? null : validateSharedPatient(patient)) ||
+      validateUppForm(form);
+    if (validationError) {
+      setError(validationError);
+      return;
     }
     setError(null);
     setIsSubmitting(true);
@@ -155,21 +155,13 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
     }
   };
 
-  // Rangos actualizados de Braden:
-  // <= 12: Riesgo Alto (rojo)
-  // 13 - 14: Riesgo Moderado (ámbar)
-  // > 14: Riesgo Bajo (verde)
-  const getBradenRiskBadge = (score: number) => {
-    if (score <= 12) {
-      return { label: 'Riesgo Alto', color: 'bg-rose-100 text-rose-800 border-rose-300' };
-    }
-    if (score <= 14) {
-      return { label: 'Riesgo Moderado', color: 'bg-amber-100 text-amber-800 border-amber-300' };
-    }
-    return { label: 'Riesgo Bajo', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' };
+  const bradenColors = {
+    alto: 'bg-rose-100 text-rose-800 border-rose-300',
+    moderado: 'bg-amber-100 text-amber-800 border-amber-300',
+    bajo: 'bg-emerald-100 text-emerald-800 border-emerald-300',
   };
-
-  const bradenRisk = getBradenRiskBadge(form.escalaBraden);
+  const band = bradenBand(form.escalaBraden);
+  const bradenRisk = { label: BRADEN_LABEL[band], color: bradenColors[band] };
 
   return (
     <form
@@ -178,7 +170,7 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
       className="px-3 pb-12 md:px-4 space-y-3.5 max-w-2xl mx-auto"
     >
       {error && (
-        <p className="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-[var(--radius-sm)] px-3 py-2">
+        <p role="alert" className="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-[var(--radius-sm)] px-3 py-2">
           {error}
         </p>
       )}
@@ -334,7 +326,7 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
                   Selecciona o escribe el Área Cerrada de origen:
                 </span>
                 <div className="flex flex-wrap gap-1.5">
-                  {['UTI', 'UCO', 'Quirófano', 'Shock Room', 'Piso / Sala'].map((area) => (
+                  {['UTI', 'UCO'].map((area) => (
                     <button
                       key={area}
                       type="button"
@@ -588,7 +580,7 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
               <button
                 type="button"
                 onClick={() =>
-                  setForm((p) => ({ ...p, escalaBraden: Math.max(3, p.escalaBraden - 1) }))
+                  setForm((p) => ({ ...p, escalaBraden: Math.max(BRADEN.min, p.escalaBraden - 1) }))
                 }
                 className="w-12 h-12 rounded-[var(--radius-sm)] bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-lg transition-[transform,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer"
               >
@@ -598,13 +590,14 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
               <div className="flex flex-col items-center">
                 <input
                   type="number"
-                  min="3"
-                  max="23"
+                  min={BRADEN.min}
+                  max={BRADEN.max}
+                  aria-label="Puntaje de Braden"
                   value={form.escalaBraden}
                   onChange={(e) => {
                     const v = parseInt(e.target.value, 10);
                     if (!isNaN(v)) {
-                      setForm((p) => ({ ...p, escalaBraden: Math.min(23, Math.max(3, v)) }));
+                      setForm((p) => ({ ...p, escalaBraden: Math.min(BRADEN.max, Math.max(BRADEN.min, v)) }));
                     }
                   }}
                   className="w-20 text-center font-extrabold text-3xl text-slate-800 outline-none"
@@ -615,7 +608,7 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
               <button
                 type="button"
                 onClick={() =>
-                  setForm((p) => ({ ...p, escalaBraden: Math.min(23, p.escalaBraden + 1) }))
+                  setForm((p) => ({ ...p, escalaBraden: Math.min(BRADEN.max, p.escalaBraden + 1) }))
                 }
                 className="w-12 h-12 rounded-[var(--radius-sm)] bg-sky-600 hover:bg-sky-700 text-white flex items-center justify-center font-bold text-lg transition-[transform,background-color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer"
               >
@@ -626,18 +619,17 @@ export const UppForm: React.FC<UppFormProps> = ({ patient, onSubmit, onOpenShift
             {/* Presets rápidos ajustados a los 3 rangos exactos */}
             <div className="grid grid-cols-3 gap-2 pt-1">
               {[
-                { score: 10, label: '≤12 (Riesgo Alto)' },
-                { score: 13, label: '13-14 (Riesgo Moderado)' },
-                { score: 15, label: '>14 (Riesgo Bajo)' },
+                { score: 10, band: 'alto' as const, label: `≤${BRADEN.altoMax} (Riesgo Alto)` },
+                { score: 13, band: 'moderado' as const, label: `${BRADEN.altoMax + 1}-${BRADEN.moderadoMax} (Riesgo Moderado)` },
+                { score: 15, band: 'bajo' as const, label: `>${BRADEN.moderadoMax} (Riesgo Bajo)` },
               ].map((preset) => (
                 <button
                   key={preset.score}
                   type="button"
+                  aria-pressed={band === preset.band}
                   onClick={() => setForm((p) => ({ ...p, escalaBraden: preset.score }))}
                   className={`py-2 px-1 rounded-[var(--radius-sm)] text-xs font-bold border transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-snappy)] active:scale-[0.98] cursor-pointer ${
-                    (preset.score === 10 && form.escalaBraden <= 12) ||
-                    (preset.score === 13 && form.escalaBraden >= 13 && form.escalaBraden <= 14) ||
-                    (preset.score === 15 && form.escalaBraden > 14)
+                    band === preset.band
                       ? 'bg-slate-800 text-white border-slate-800 shadow-[var(--shadow-rest)] hover:scale-[1.015]'
                       : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
                   }`}

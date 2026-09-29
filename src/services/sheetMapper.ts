@@ -1,6 +1,10 @@
-import type { AccesoPerifericoForm, SondaVesicalForm, UppForm } from '../types/form';
+import type { AccesoPerifericoForm, FormType, SondaVesicalForm, UppForm } from '../types/form';
+import { isoToDmy } from '../utils/dateUtils';
 
-// Cabeceras para la hoja Acceso Periférico (38 columnas)
+// El Sheet agrega "Mail Enviado" e "ID Registro" al final; la app no los manda en rowValues.
+// Code.gs escribe por NOMBRE de columna, así que estas listas deben coincidir con sus HEADERS_*.
+
+// Cabeceras para la hoja Acceso Periférico (41 columnas, A..AO)
 export const ACCESO_PERIFERICO_HEADERS = [
   'Fecha/Hora',          // A
   'Sector',              // B
@@ -75,9 +79,9 @@ export function mapAccesoPerifericoToRow(data: AccesoPerifericoForm): (string | 
     tiene && data.ubicacionMID ? 'SI' : '',                                         // P
     evaluaRotulo ? ynOrBlank(data.tieneRotulo) : '',                                // Q
     evaluaRotulo && data.tieneRotulo === true ? ynOrBlank(data.rotuloTieneFecha) : '', // R
-    evaluaRotulo && data.tieneRotulo === true ? ynOrBlank(data.rotuloTieneEnfermero ?? data.rotuloTieneNombre) : '', // S
+    evaluaRotulo && data.tieneRotulo === true ? ynOrBlank(data.rotuloTieneNombre) : '',   // S
     evaluaRotulo && data.tieneRotulo === true ? ynOrBlank(data.rotuloTieneLegajo) : '', // T
-    evaluaRotulo && data.tieneRotulo === true ? ynOrBlank(data.rotuloTieneEnfermero ?? data.rotuloTieneNombre) : '', // U
+    evaluaRotulo && data.tieneRotulo === true ? ynOrBlank(data.rotuloTieneEnfermero) : '', // U
     evaluaRotulo && data.tieneRotulo === true ? ynOrBlank(data.rotuloTieneTurno) : '', // V
     evaluaRotulo && data.tieneRotulo === true ? ynOrBlank(data.rotuloTieneABB) : '', // W
     tiene && data.visibilidad === true ? 'SI' : '',                                 // X
@@ -96,12 +100,12 @@ export function mapAccesoPerifericoToRow(data: AccesoPerifericoForm): (string | 
     tiene ? (data.caracteristicasRetorno ? 'SI' : 'NO') : '',                        // AK
     tiene ? (data.infusionType || '') : '',                                         // AL
     data.motivoAusente ? (data.observaciones ? `${data.motivoAusente} - ${data.observaciones}` : data.motivoAusente) : (data.observaciones || ''), // AM
-    data.fechaIngreso || '',                                                        // AN
+    isoToDmy(data.fechaIngreso),                                                    // AN
     data.sexo === 'M' ? 'Masculino' : data.sexo === 'F' ? 'Femenino' : ''           // AO
   ];
 }
 
-// Cabeceras para la hoja UPP (Úlceras por Presión) (36 columnas)
+// Cabeceras para la hoja UPP (Úlceras por Presión) (37 columnas, A..AK)
 export const UPP_HEADERS = [
   'Fecha/Hora',                // A
   'Sector',                    // B
@@ -156,8 +160,8 @@ export function mapUppToRow(data: UppForm): (string | number | boolean)[] {
     data.historiaClinica || '',                                                     // E
     data.cantidadEnfermeras ?? '',                                                  // F
     data.cantidadAuxiliares ?? '',                                                  // G
-    data.fechaIngreso || '',                                                        // H
-    data.pasoAreaCerrada ? (data.areaCerradaCual ? `SI (${data.areaCerradaCual})` : 'SI') : 'NO', // I
+    isoToDmy(data.fechaIngreso),                                                    // H
+    tiene ? (data.pasoAreaCerrada ? (data.areaCerradaCual ? `SI (${data.areaCerradaCual})` : 'SI') : 'NO') : '', // I
     tiene ? 'SI' : '',                                                              // J
     !tiene ? 'NO' : '',                                                             // K
     tiene ? (data.cuantas ?? 1) : 0,                                                // L
@@ -189,7 +193,7 @@ export function mapUppToRow(data: UppForm): (string | number | boolean)[] {
   ];
 }
 
-const MOTIVO_UBICACION_LABEL: Record<string, string> = {
+export const MOTIVO_UBICACION_LABEL: Record<string, string> = {
   nefrectomia_derecha: 'Nefrectomía derecha',
   nefrectomia_izquierda: 'Nefrectomía izquierda',
   bricker: 'Bricker',
@@ -213,6 +217,7 @@ export const SONDA_HEADERS = [
   'Ubicacion Correcta',
   'Motivo Ubicacion',
   'Observaciones',
+  'Estado Cama',
 ];
 
 export function mapSondaToRow(data: SondaVesicalForm): (string | number | boolean)[] {
@@ -229,16 +234,30 @@ export function mapSondaToRow(data: SondaVesicalForm): (string | number | boolea
     data.historiaClinica || '',
     data.cantidadEnfermeras ?? '',
     data.cantidadAuxiliares ?? '',
-    data.fechaIngreso || '',
+    isoToDmy(data.fechaIngreso),
     data.sexo === 'M' ? 'Masculino' : data.sexo === 'F' ? 'Femenino' : '',
-    data.tieneSonda || (data.motivoAusente ? 'NO' : ''),
+    data.motivoAusente ? '' : (data.tieneSonda || ''),
     tiene ? (data.numeroSonda || '') : '',
     tiene ? (data.lumenes || '') : '',
     tiene ? (data.fijacion || '') : '',
     tiene ? (data.ubicacionCorrecta || '') : '',
     motivo,
-    data.motivoAusente
-      ? (data.observaciones ? `${data.motivoAusente} - ${data.observaciones}` : data.motivoAusente)
-      : (data.observaciones || ''),
+    data.observaciones || '',
+    data.motivoAusente || '',
   ];
+}
+
+export const HEADERS_BY_FORM: Record<FormType, string[]> = {
+  ACCESO_PERIFERICO: ACCESO_PERIFERICO_HEADERS,
+  UPP: UPP_HEADERS,
+  SONDA_VESICAL: SONDA_HEADERS,
+};
+
+export function mapRecordToRow(
+  formType: FormType,
+  data: AccesoPerifericoForm | UppForm | SondaVesicalForm
+): (string | number | boolean)[] {
+  if (formType === 'ACCESO_PERIFERICO') return mapAccesoPerifericoToRow(data as AccesoPerifericoForm);
+  if (formType === 'SONDA_VESICAL') return mapSondaToRow(data as SondaVesicalForm);
+  return mapUppToRow(data as UppForm);
 }
