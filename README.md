@@ -46,9 +46,11 @@ En `localhost` no se registra el service worker, para que la caché no tape los 
 
 | Variable | Uso |
 |---|---|
-| `VITE_WEBHOOK_URL` | URL del Apps Script **solo para desarrollo**. En producción dejala vacía: todo lo que empieza con `VITE_` queda dentro del JavaScript público. La URL y la clave se cargan una vez en Ajustes (⚙️) y quedan en el dispositivo. |
+| `VITE_WEBHOOK_URL` | URL del Apps Script. Se incluye en el build: así los dispositivos envían al Sheet sin configurar nada. |
 
-Si en Ajustes se deja la URL vacía, la app trabaja solo en el dispositivo aunque exista `VITE_WEBHOOK_URL`.
+La URL queda dentro del JavaScript público de la app. Para uso personal es aceptable; quien la tenga podría agregar filas o leer las estadísticas, pero no pedir el reporte a otro correo (los destinatarios están fijos en `Code.gs`).
+
+Ajustes (⚙️) permite cambiar la URL en un dispositivo. Si ahí se guarda vacía, ese dispositivo trabaja solo en local aunque el build tenga `VITE_WEBHOOK_URL`.
 
 ## Estructura
 
@@ -90,10 +92,9 @@ Los registros sin confirmar no se borran nunca solos: el historial conserva como
 
 1. Abrí la planilla › **Extensiones › Apps Script** y pegá [`google-apps-script/Code.gs`](google-apps-script/Code.gs).
 2. **Configuración del proyecto**: zona horaria `America/Argentina/Buenos_Aires`. En la planilla, **Archivo › Configuración**: configuración regional Argentina y la misma zona horaria.
-3. **Configuración del proyecto › Propiedades del script**: agregá `API_TOKEN` con una clave larga. Sin esa propiedad el webhook acepta llamadas de cualquiera.
-4. **Implementar › Nueva implementación** › tipo **Aplicación web**, ejecutar como vos, acceso **Cualquier usuario**. Copiá la URL.
-5. En la app, **Ajustes (⚙️)**: pegá la URL y la clave, y tocá **Probar conexión**.
-6. En la planilla, menú **🏥 Planilla Enfermera**:
+3. **Implementar › Nueva implementación** › tipo **Aplicación web**, ejecutar como vos, acceso **Cualquier usuario**. Copiá la URL.
+4. Poné la URL en `VITE_WEBHOOK_URL` del `.env` antes de armar el build (o cargala en **Ajustes (⚙️)** del dispositivo y tocá **Probar conexión**).
+5. En la planilla, menú **🏥 Planilla Enfermera**:
    - **Verificar / Inicializar Hojas y Cabeceras**: crea las hojas y pone en formato texto fecha, habitación, cama, HC e id.
    - **Programar Envío Automático Diario (16:00 hs)**: opcional.
 
@@ -105,14 +106,14 @@ Cada cambio en `Code.gs`: pegarlo y **Implementar › Administrar implementacion
 
 El script lee y escribe **por nombre de columna**, no por posición: se pueden reordenar columnas en la planilla sin romper nada. Las columnas nuevas se agregan al final. La app manda los nombres en cada registro; las listas están en `sheetMapper.ts` y deben coincidir con `HEADERS_*` de `Code.gs` (lo verifica `npm test`).
 
+### Clave del script (opcional)
+
+El script acepta una clave: si en **Configuración del proyecto › Propiedades del script** se crea `API_TOKEN`, rechaza toda llamada que no la traiga, y la clave se carga en **Ajustes (⚙️)** de cada dispositivo. **No se usa**: sin esa propiedad todo funciona igual. Si algún día se activa, primero hay que tener todos los dispositivos en la 1.3 y cargarles la clave; la app 1.2 no ve el rechazo y daría por enviados registros que no llegaron.
+
 ### Pasar de la versión 1.2 a la 1.3
 
-Hacelo en este orden:
-
-1. **Script primero.** Pegá el Code.gs 1.3 y publicá una nueva versión *sin* crear todavía `API_TOKEN`. El script nuevo acepta los registros de la app vieja. Al revés no: la app 1.3 contra el script 1.2 pierde el estado de cama de Sondas, no puede confirmar registros y no puede cerrar el turno.
-2. **URL en Ajustes.** En cada dispositivo abrí Ajustes y tocá **Guardar Configuración** con la URL cargada. La v1.2 tomaba la URL del build; la 1.3 se publica sin ella. Si no se guarda, el dispositivo pasa a "Modo Local": los registros se guardan en el celular y se envían recién cuando se configura la URL.
-3. **App después.** Publicá la app 1.3 y en cada dispositivo tocá **Actualizar** en el aviso de versión nueva.
-4. **Clave al final.** Recién cuando todos los dispositivos estén en la 1.3, creá `API_TOKEN` y cargala en Ajustes. La app vieja no ve el rechazo del script y daría por enviados registros que no llegaron.
+1. **Script primero.** Pegá el Code.gs 1.3 y publicá una nueva versión. El script nuevo acepta los registros de la app vieja. Al revés no: la app 1.3 contra el script 1.2 pierde el estado de cama de Sondas, no puede confirmar registros y no puede cerrar el turno.
+2. **App después.** Armá el build con `VITE_WEBHOOK_URL` en el `.env` y publicalo. Los dispositivos siguen enviando al Sheet sin tocar nada y muestran el aviso **Hay una versión nueva · Actualizar**; si no se toca, la versión nueva se carga la próxima vez que se cierre y se abra la app.
 
 Además:
 

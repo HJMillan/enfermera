@@ -4,6 +4,7 @@
 >
 > Diferencias con lo planeado:
 > - 1.2: no hay período con `REQUIRE_TOKEN = false`. El token es obligatorio en cuanto se crea la propiedad `API_TOKEN`; sin ella el script acepta todo, como antes.
+> - 1.2 (decisión posterior): **no se usa `API_TOKEN`** y la URL **sí va en el build** (`VITE_WEBHOOK_URL`), para no tener que configurar cada dispositivo. El soporte de clave queda en el código por si se activa más adelante.
 > - 2.2: el reporte de cierre y "Deshacer" se piden por JSONP (GET) para poder leer la respuesta real del script.
 > - 3.3: en lugar de un script aparte, el menú del Sheet tiene **📅 Normalizar fechas a texto**.
 > - 3.5: Sondas guarda el estado de cama en una columna nueva, `Estado Cama`.
